@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension>
+	<information>
+		<name>Librarian Sync</name>
+		<version>1.0</version>
+		<author>barsanuphe</author>
+		<id>Librarian Sync</id>
+	</information>
+	<menus>
+		<menu type="json" dynamic="true">menu.json</menu>
+	</menus>
+</extension>

@@ -1,0 +1,5 @@
+{
+	"items": [
+		{"name": "Librarian Sync","exitmenu": false, "priority": -1,"status": false, "action": "python generate_collections.py 2> log.txt"}
+	]
+}
