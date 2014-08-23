@@ -4,6 +4,8 @@
 #TODO: tolerate missing yaml options
 #TODO: check if pyyaml/calibre/python3 are installed and used
 
+#TODO: ADD TAG MARCHE PAS TOUT A FAIT!!!!
+
 
 import yaml, os, subprocess, shutil, codecs, sys, hashlib, time, concurrent.futures, multiprocessing
 
@@ -172,7 +174,7 @@ class Ebook(object):
     def to_dict(self):
         return { self.filename: {
                                     "author": self.author, "title": self.title,
-                                    "path": self.path,  "tags": ",".join(self.tags),
+                                    "path": self.path,  "tags": ",".join([el for el in self.tags if el.strip() != ""]),
                                     "format": self.format, "date": self.date,
                                     "last_synced_hash": self.last_synced_hash, "converted_to_mobi_hash": self.converted_to_mobi_hash, "converted_to_mobi_from_hash": self.converted_to_mobi_from_hash
                                 }
@@ -211,7 +213,7 @@ class Library(object):
                         eb.author = doc[filename]['author']
                         eb.title = doc[filename]['title']
                         eb.format = doc[filename]['format']
-                        eb.tags = [el.strip() for el in doc[filename]['tags'].split(",")]
+                        eb.tags = [el.strip() for el in doc[filename]['tags'].split(",") if el.strip() != ""]
                         eb.date = doc[filename]['date']
                         eb.converted_to_mobi_hash = doc[filename]['converted_to_mobi_hash']
                         eb.converted_to_mobi_from_hash = doc[filename]['converted_to_mobi_from_hash']
@@ -424,6 +426,25 @@ class Library(object):
             print(incomplete_list)
         return found_incomplete
 
+    def search(self, search_string):
+        filtered = []
+        for eb in self.ebooks:
+            if search_string.lower() in eb.author.lower() or search_string.lower() in eb.title.lower():
+                print(" -> ", eb)
+                filtered.append(eb)
+        return filtered
+
+    def search_tag(self, search_tag_string=None):
+        filtered = []
+        for eb in self.ebooks:
+            if search_tag_string == None and eb.tags in [[], [""]]:
+                print(" -> ", eb, " is untagged")
+                filtered.append(eb)
+            elif search_tag_string != None and search_tag_string.lower() in eb.tags:
+                print(" -> ", eb)
+                filtered.append(eb)
+        return filtered
+
 if __name__ == "__main__":
 
     l = Library()
@@ -443,9 +464,27 @@ if __name__ == "__main__":
                 sys.exit(-1)
         if "k" in arg:
             l.sync_with_kindle()
+        if "f" in arg:
+            assert len(sys.argv) >= 3 and len(sys.argv[2]) > 3
+            filtered = l.search(sys.argv[2])
+            if "t" in arg:
+                assert len(sys.argv) >=4
+                new_tag = sys.argv[3].lower()
+                for eb in filtered:
+                    if new_tag not in eb.tags:
+                        print(" -> ", eb, "tagged as", new_tag)
+                        eb.tags.append(new_tag)
+                    else:
+                        print(" -> ", eb, "already tagged as", new_tag, ", nothing to do.")
+        if "u" in arg:
+            if len(sys.argv) == 3:
+                filtered = l.search_tag(sys.argv[2])
+            elif len(sys.argv) == 2:
+                filtered = l.search_tag()
+
     except Exception as err:
         print(err)
-        print("i, r and/or k.")
+        print("i, r, s, f, t, u and/or k.")
         sys.exit(-1)
 
     l.save_db()
