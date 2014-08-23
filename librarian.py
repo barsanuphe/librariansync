@@ -184,47 +184,61 @@ class Ebook(object):
         exported_tags = ['"%s"'%tag for tag in self.tags]
         return """\t"%s": [%s],\n"""%(os.path.join(KINDLE_DOCUMENTS_SUBDIR, self.exported_filename), ",".join(exported_tags))
 
+    def try_to_load_from_yaml(self, yaml_doc):
+        filename = list(yaml_doc.keys())[0]
+        path = yaml_doc[filename]['path']
+        if not os.path.exists(path):
+            print("File %s in DB cannot be found, ignoring."%path)
+            return False
+        try:
+            self.author = yaml_doc[filename]['author']
+            self.title = yaml_doc[filename]['title']
+            self.format = yaml_doc[filename]['format']
+            self.tags = [el.strip() for el in yaml_doc[filename]['tags'].split(",") if el.strip() != ""]
+            self.date = yaml_doc[filename]['date']
+            self.converted_to_mobi_hash = yaml_doc[filename]['converted_to_mobi_hash']
+            self.converted_to_mobi_from_hash = yaml_doc[filename]['converted_to_mobi_from_hash']
+            self.last_synced_hash = yaml_doc[filename]['last_synced_hash']
+        except Exception as err:
+            print("Incorrect db!", err)
+            return False
+        return True
+
 class Library(object):
     def __init__(self):
         self.ebooks = []
 
+    def _load_ebook(self, yaml_doc):
+        filename = list(yaml_doc.keys())[0]
+        path = yaml_doc[filename]['path']
+        eb = Ebook(path)
+        return eb.try_to_load_from_yaml(yaml_doc), eb
+
     def open_db(self):
         self.db = []
         if os.path.exists(LIBRARY_DB):
-            start = time.process_time()
-            for (i,doc) in enumerate(yaml.load_all(open(LIBRARY_DB, 'r'))):
-                # General section for configuration
-                if(i == 0):
-                    global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT
-                    KINDLE_ROOT = doc["General"]["kindle_root"]
-                    LIBRARY_ROOT = doc["General"]["library_root"]
-                    SCRAPE_ROOT = doc["General"]["scrape_root"]
-                    BACKUP_IMPORTED_EBOOKS = doc["General"]["backup_imported_ebooks"]
-                    refresh_global_variables()
-                    global AUTHOR_ALIASES
-                    AUTHOR_ALIASES = doc["General"]["author_aliases"]
-                    continue
-                # the rest: ebook entries
-                try:
-                    filename = list(doc.keys())[0]
-                    path = doc[filename]['path']
-                    if os.path.exists(path):
-                        eb = Ebook( path )
-                        eb.author = doc[filename]['author']
-                        eb.title = doc[filename]['title']
-                        eb.format = doc[filename]['format']
-                        eb.tags = [el.strip() for el in doc[filename]['tags'].split(",") if el.strip() != ""]
-                        eb.date = doc[filename]['date']
-                        eb.converted_to_mobi_hash = doc[filename]['converted_to_mobi_hash']
-                        eb.converted_to_mobi_from_hash = doc[filename]['converted_to_mobi_from_hash']
-                        eb.last_synced_hash = doc[filename]['last_synced_hash']
-                        self.ebooks.append(eb)
-                    else:
-                        print("File %s in DB cannot be found, ignoring."%path)
-                except:
-                    print("Incorrect db!")
-                    raise Exception("Corrupted db")
-            print("Database opened in %.2fs."%(time.process_time() - start))
+            start = time.perf_counter()
+            all_yaml_docs = list(yaml.load_all(open(LIBRARY_DB, 'r')))
+
+            # General section for configuration
+            global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT
+            first_document = all_yaml_docs[0]
+            KINDLE_ROOT = first_document["General"]["kindle_root"]
+            LIBRARY_ROOT = first_document["General"]["library_root"]
+            SCRAPE_ROOT = first_document["General"]["scrape_root"]
+            BACKUP_IMPORTED_EBOOKS = first_document["General"]["backup_imported_ebooks"]
+            refresh_global_variables()
+            global AUTHOR_ALIASES
+            AUTHOR_ALIASES = first_document["General"]["author_aliases"]
+
+            # the rest
+            with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
+                future_to_ebook = { executor.submit(self._load_ebook, doc): doc for doc in all_yaml_docs[1:]}
+                for future in concurrent.futures.as_completed(future_to_ebook):
+                    success, ebook = future.result()
+                    if success:
+                        self.ebooks.append(ebook)
+            print("Database opened in %.2fs."%(time.perf_counter() - start))
 
     def _refresh_ebook(self, full_path, old_db):
         is_already_in_db = False
