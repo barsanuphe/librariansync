@@ -1,15 +1,25 @@
 # -*- coding: utf-8 -*-
 
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
-#TODO: tolerate missing yaml options
-#TODO: check if pyyaml/calibre/python3 are installed and used
+#TODO: check if python3 is used, but SyntexError raised if run with python2
 
-#TODO: ADD TAG MARCHE PAS TOUT A FAIT!!!!
+import os, subprocess, shutil, codecs, sys, hashlib, time, concurrent.futures, multiprocessing, marshal
+
+try:
+    assert subprocess.call("ebook-meta --version", shell=True, stdout=subprocess.DEVNULL) == 0
+    assert subprocess.call("ebook-convert --version", shell=True, stdout=subprocess.DEVNULL) == 0
+except AssertionError as err:
+    print("Calibre must be installed!")
+    sys.exit(-1)
+
+try:
+    import yaml
+except Exception as err:
+    print("pyyaml (for python3) must be installed!")
+    sys.exit(-1)
 
 
-import yaml, os, subprocess, shutil, codecs, sys, hashlib, time, concurrent.futures, multiprocessing, marshal
-
-BACKUP_IMPORTED_EBOOKS = False
+BACKUP_IMPORTED_EBOOKS = True
 SCRAPE_ROOT = ""
 KINDLE_DOCUMENTS_SUBDIR = "library"  #TODO: yaml option
 
@@ -223,14 +233,21 @@ class Library(object):
         if os.path.exists(LIBRARY_CONFIG):
             start = time.perf_counter()
             doc = yaml.load(open(LIBRARY_CONFIG, 'r'))
-            global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT
-            KINDLE_ROOT = doc["kindle_root"]
-            LIBRARY_ROOT = doc["library_root"]
-            SCRAPE_ROOT = doc["scrape_root"]
-            BACKUP_IMPORTED_EBOOKS = doc["backup_imported_ebooks"]
-            refresh_global_variables()
-            global AUTHOR_ALIASES
-            AUTHOR_ALIASES = doc["author_aliases"]
+            try:
+                global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT
+                KINDLE_ROOT = doc["kindle_root"]
+                LIBRARY_ROOT = doc["library_root"]
+                SCRAPE_ROOT = doc["scrape_root"]
+                refresh_global_variables()
+            except Exception as err:
+                print("Missing config option: ", err)
+                raise Exception("Invalid configuration file!")
+
+            if "backup_imported_ebooks" in list(doc.keys()):
+                BACKUP_IMPORTED_EBOOKS = doc["backup_imported_ebooks"]
+            if "author_aliases" in list(doc.keys()):
+                global AUTHOR_ALIASES
+                AUTHOR_ALIASES = doc["author_aliases"]
             print("Config opened in %.3fs."%(time.perf_counter() - start))
 
         # ebooks
@@ -477,7 +494,12 @@ class Library(object):
 if __name__ == "__main__":
 
     l = Library()
-    l.open_db()
+
+    try:
+        l.open_db()
+    except Exception as err:
+        print("Error loading DB: ", err)
+        sys.exit(-1)
 
     try:
         arg = sys.argv[1].lower()
@@ -523,7 +545,6 @@ if __name__ == "__main__":
 
     except Exception as err:
         print(err)
-        print("i, r, s, f, t, u and/or k.")
         sys.exit(-1)
 
     l.save_db()
