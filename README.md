@@ -97,15 +97,17 @@ Once the requirements are met, just copy the librariansync folder into the exten
 
 ### Usage
 
+From the Kindle, launch KUAL. A new menu option *Librarian Sync* should appear, which contains two entries:
 
-From the Kindle, launch KUAL. A new menu option "Librarian Sync" should appear.
+- *Rebuild all collections* : to clear all existing collections and rebuild them using the json file
+- *Add to collections* : to only add ebooks to existing or new collections
 
 ### What it does
 
-
 After syncing with the main script librarian.py, and if tags are defined in library.yaml for entries,
 the extensions/ folder on the Kindle should contain a file, collections.json.
-Librarian Sync removes all collections, then adds the collections as defined in collections.json.
+When *rebuilding collections*, Librarian Sync removes all collections, then adds the collections as defined in collections.json.
+When *adding to them*, it preserves already existing collections, and only either add entries to them or creates new collections.
 Allow for a few seconds for the Kindle database and interface to reflect the changes made.
 
 ### collections.json example
