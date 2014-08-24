@@ -1,5 +1,24 @@
 {
-	"items": [
-		{"name": "Librarian Sync","exitmenu": false, "priority": -1,"status": false, "action": "python generate_collections.py 2> log.txt"}
-	]
+    "items": [
+        {
+            "name": "Librarian Sync",
+            "priority": -1,
+            "items": [
+                {
+                    "name": "Rebuild all collections",
+                    "priority": -1,
+                    "exitmenu": false,
+                    "status": false,
+                    "action": "python generate_collections.py rebuild 2> log.txt"
+                },
+                {
+                    "name": "Add to collections",
+                    "priority": -1,
+                    "exitmenu": false,
+                    "status": false,
+                    "action": "python generate_collections.py add 2> log.txt"
+                }
+                ]
+        }
+    ]
 }

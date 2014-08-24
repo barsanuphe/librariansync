@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import subprocess, json, os, uuid, time
+import subprocess, json, os, uuid, time, sys
 
 DB = "cc.db" # kindle db name
 KINDLE_DB_PATH = "/var/local/%s"%DB # kindle db path
@@ -24,16 +24,34 @@ def parse_entries():
 
     return ebooks, collections
 
+def parse_existing_collections():
+    existing_collections = {}
+
+    out = subprocess.check_output("""sqlite3 %s 'select i_collection_uuid,i_member_uuid from Collections'"""%KINDLE_DB_PATH, shell=True)
+    for line in out.splitlines():
+        collection_uuid, ebook_uuid = line.split('|')
+        if collection_uuid in existing_collections.keys():
+            existing_collections[collection_uuid].append(ebook_uuid)
+        else:
+            existing_collections[collection_uuid] = [ebook_uuid]
+    print existing_collections
+    return existing_collections
+
 def parse_config(config_file):
     return json.load(open(config_file, 'r'), 'utf8')
 
-def update_kinde_db(db_ebooks, db_collections, config_tags):
-    # remove all previous collections
-    for coll_uuid in db_collections.values():
-        send_curl_post( delete_collection_json(coll_uuid) )
-    db_collections = {} # raz
+def update_kinde_db(db_ebooks, db_collections, config_tags, complete_rebuild = True):
 
-    collections_dict = {} # dict [collection uuid] = [ ebook uuids, ]
+    if complete_rebuild:
+        # remove all previous collections
+        for coll_uuid in db_collections.values():
+            send_curl_post( delete_collection_json(coll_uuid) )
+        db_collections = {} # raz
+
+        collections_dict = {} # dict [collection uuid] = [ ebook uuids, ]
+    else:
+        collections_dict = parse_existing_collections()
+
     for key in config_tags.keys():
         kindle_path = os.path.join(KINDLE_EBOOKS_ROOT, key)
 
@@ -47,9 +65,10 @@ def update_kinde_db(db_ebooks, db_collections, config_tags):
                     send_curl_post( insert_new_collection_entry(new_coll_uuid, coll, timestamp) )
                     db_collections[coll] = new_coll_uuid
 
-                # members
+                # update collection members
                 if db_collections[coll] in collections_dict.keys():
-                    collections_dict[db_collections[coll]].append(eb_uuid)
+                    if eb_uuid not in collections_dict[db_collections[coll]]:
+                        collections_dict[db_collections[coll]].append(eb_uuid)
                 else:
                     collections_dict[db_collections[coll]] = [eb_uuid]
 
@@ -77,13 +96,17 @@ def send_curl_post(command):
     curl_command = "curl --data '%s' http://localhost:9101/change --header 'Content-Type:application/json'"%(full_command)
     subprocess.call(curl_command, shell=True)
 
-def update_cc_db():
+def update_cc_db(complete_rebuild = True):
     # build dictionaries of ebooks/collections with their uuids
     db_ebooks, db_collections = parse_entries()
     # parse tags json
     config_tags = parse_config(TAGS)
     # update kindle db accordingly
-    update_kinde_db(db_ebooks, db_collections, config_tags)
+    update_kinde_db(db_ebooks, db_collections, config_tags, complete_rebuild)
 
 if __name__ == "__main__":
-    update_cc_db()
+    command = sys.argv[1]
+    if command == "add":
+        update_cc_db(complete_rebuild = False)
+    elif command == "rebuild":
+        update_cc_db(complete_rebuild = True)
