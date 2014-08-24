@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import subprocess, json, os, uuid, time, sys
+import subprocess, json, os, uuid, time, sys, shutil
 
 DB = "cc.db" # kindle db name
 KINDLE_DB_PATH = "/var/local/%s"%DB # kindle db path
@@ -58,19 +58,51 @@ def update_kinde_db(db_ebooks, db_collections, config_tags, complete_rebuild = T
         if kindle_path in db_ebooks.keys():
             eb_uuid = db_ebooks[kindle_path]
             for coll in config_tags[key]:
-                if coll not in db_collections.keys():
-                    new_coll_uuid = uuid.uuid4()
-                    timestamp = int(time.time())
-                    #insert new collection dans Entries
-                    send_curl_post( insert_new_collection_entry(new_coll_uuid, coll, timestamp) )
-                    db_collections[coll] = new_coll_uuid
 
-                # update collection members
-                if db_collections[coll] in collections_dict.keys():
-                    if eb_uuid not in collections_dict[db_collections[coll]]:
-                        collections_dict[db_collections[coll]].append(eb_uuid)
-                else:
-                    collections_dict[db_collections[coll]] = [eb_uuid]
+                # fw 5.4.5.2: nested collections do not work (all are visible on home, but not displayed
+                # inside the parent collection)
+
+                #if '/' in coll:
+                #    collection_hierarchy = coll.split("/")
+                #else:
+                #    collection_hierarchy = [coll]
+
+                # disabling nested collections for the moment...
+                collection_hierarchy = [coll]
+
+                # nested collections
+                for (i,subcollection) in enumerate(reversed(collection_hierarchy)):
+                    # create if necessary
+                    print i, subcollection
+                    if subcollection not in db_collections.keys():
+                        new_coll_uuid = uuid.uuid4()
+                        timestamp = int(time.time())
+                        #insert new collection dans Entries
+                        #TODO: if not top collection, p_isVisibleInHome = 0
+                        send_curl_post( insert_new_collection_entry(new_coll_uuid, subcollection, timestamp) )
+                        db_collections[subcollection] = new_coll_uuid
+                        print "new, ", new_coll_uuid
+
+                    if i == 0: # ebook collection:
+                        print "bottom collection", subcollection
+                        # update collection members: ebooks
+                        if db_collections[subcollection] in collections_dict.keys():
+                            if eb_uuid not in collections_dict[db_collections[subcollection]]:
+                                collections_dict[db_collections[subcollection]].append(eb_uuid)
+                        else:
+                            collections_dict[db_collections[subcollection]] = [eb_uuid]
+                    else:
+                        print "top/inter collection", subcollection
+                        # update collection members: subcollections
+                        subcollection_to_collection = list(reversed(collection_hierarchy))[i-1] # verify it exists
+                        print "lower", subcollection_to_collection
+                        subcollection_to_collection_uuid = collections_dict[db_collections[subcollection_to_collection]] #TODO: verify if it exists
+
+                        if db_collections[subcollection] in collections_dict.keys():
+                            if subcollection_to_collection_uuid not in collections_dict[db_collections[subcollection]]:
+                                collections_dict[db_collections[subcollection]].append(subcollection_to_collection_uuid)
+                        else:
+                            collections_dict[db_collections[subcollection]] = [subcollection_to_collection_uuid]
 
     # update all 'Collections' entries with new members
     for coll in collections_dict.keys():

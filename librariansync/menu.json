@@ -9,14 +9,14 @@
                     "priority": -1,
                     "exitmenu": false,
                     "status": false,
-                    "action": "python generate_collections.py rebuild 2> log.txt"
+                    "action": "python generate_collections.py rebuild &> log.txt"
                 },
                 {
                     "name": "Add to collections",
                     "priority": -1,
                     "exitmenu": false,
                     "status": false,
-                    "action": "python generate_collections.py add 2> log.txt"
+                    "action": "python generate_collections.py add &> log.txt"
                 }
                 ]
         }
