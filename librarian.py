@@ -7,14 +7,15 @@
 #TODO: ADD TAG MARCHE PAS TOUT A FAIT!!!!
 
 
-import yaml, os, subprocess, shutil, codecs, sys, hashlib, time, concurrent.futures, multiprocessing
+import yaml, os, subprocess, shutil, codecs, sys, hashlib, time, concurrent.futures, multiprocessing, marshal
 
 BACKUP_IMPORTED_EBOOKS = False
 SCRAPE_ROOT = ""
 KINDLE_DOCUMENTS_SUBDIR = "library"  #TODO: yaml option
 
 # library is located next to this script
-LIBRARY_DB = os.path.join(os.path.dirname(os.path.realpath(__file__)), "library.yaml")
+LIBRARY_DB = os.path.join(os.path.dirname(os.path.realpath(__file__)), "library.db")
+LIBRARY_CONFIG = os.path.join(os.path.dirname(os.path.realpath(__file__)), "librarian.yaml")
 AUTHOR_ALIASES = {}
 
 def refresh_global_variables():
@@ -49,10 +50,13 @@ class Ebook(object):
         self.date = 0
         self.format = os.path.splitext(self.path)[1][1:].lower() # extension without the .
         self.was_converted_to_mobi = False
-        self.current_hash = hashlib.sha1(open(self.path, 'rb').read()).hexdigest()
         self.converted_to_mobi_from_hash = ""
         self.converted_to_mobi_hash = ""
         self.last_synced_hash = ""
+
+    @property
+    def current_hash(self):
+        return hashlib.sha1(open(self.path, 'rb').read()).hexdigest()
 
     @property
     def filename(self):
@@ -172,33 +176,31 @@ class Ebook(object):
         return "%s/%s (%s) %s"%(self.author, self.author, self.date, self.title)
 
     def to_dict(self):
-        return { self.filename: {
-                                    "author": self.author, "title": self.title,
-                                    "path": self.path,  "tags": ",".join([el for el in self.tags if el.strip() != ""]),
-                                    "format": self.format, "date": self.date,
-                                    "last_synced_hash": self.last_synced_hash, "converted_to_mobi_hash": self.converted_to_mobi_hash, "converted_to_mobi_from_hash": self.converted_to_mobi_from_hash
-                                }
+        return  {
+                    "author": self.author, "title": self.title,
+                    "path": self.path,  "tags": ",".join([el for el in self.tags if el.strip() != ""]),
+                    "format": self.format, "date": self.date,
+                    "last_synced_hash": self.last_synced_hash, "converted_to_mobi_hash": self.converted_to_mobi_hash, "converted_to_mobi_from_hash": self.converted_to_mobi_from_hash
                 }
+
 
     def to_json(self):
         exported_tags = ['"%s"'%tag for tag in self.tags]
         return """\t"%s": [%s],\n"""%(os.path.join(KINDLE_DOCUMENTS_SUBDIR, self.exported_filename), ",".join(exported_tags))
 
-    def try_to_load_from_yaml(self, yaml_doc):
-        filename = list(yaml_doc.keys())[0]
-        path = yaml_doc[filename]['path']
-        if not os.path.exists(path):
+    def try_to_load_from_json(self, everything, filename):
+        if not os.path.exists(everything[filename]["path"]):
             print("File %s in DB cannot be found, ignoring."%path)
             return False
         try:
-            self.author = yaml_doc[filename]['author']
-            self.title = yaml_doc[filename]['title']
-            self.format = yaml_doc[filename]['format']
-            self.tags = [el.strip() for el in yaml_doc[filename]['tags'].split(",") if el.strip() != ""]
-            self.date = yaml_doc[filename]['date']
-            self.converted_to_mobi_hash = yaml_doc[filename]['converted_to_mobi_hash']
-            self.converted_to_mobi_from_hash = yaml_doc[filename]['converted_to_mobi_from_hash']
-            self.last_synced_hash = yaml_doc[filename]['last_synced_hash']
+            self.author = everything[filename]['author']
+            self.title = everything[filename]['title']
+            self.format = everything[filename]['format']
+            self.tags = [el.strip() for el in everything[filename]['tags'].split(",") if el.strip() != ""]
+            self.date = everything[filename]['date']
+            self.converted_to_mobi_hash = everything[filename]['converted_to_mobi_hash']
+            self.converted_to_mobi_from_hash = everything[filename]['converted_to_mobi_from_hash']
+            self.last_synced_hash = everything[filename]['last_synced_hash']
         except Exception as err:
             print("Incorrect db!", err)
             return False
@@ -208,37 +210,42 @@ class Library(object):
     def __init__(self):
         self.ebooks = []
 
-    def _load_ebook(self, yaml_doc):
-        filename = list(yaml_doc.keys())[0]
-        path = yaml_doc[filename]['path']
-        eb = Ebook(path)
-        return eb.try_to_load_from_yaml(yaml_doc), eb
+    def _load_ebook(self, everything, filename):
+        if not "path" in list(everything[filename].keys()):
+            return False, None
+        eb = Ebook(everything[filename]["path"])
+        return eb.try_to_load_from_json(everything, filename), eb
 
     def open_db(self):
         self.db = []
-        if os.path.exists(LIBRARY_DB):
-            start = time.perf_counter()
-            all_yaml_docs = list(yaml.load_all(open(LIBRARY_DB, 'r')))
 
-            # General section for configuration
+        #configuration
+        if os.path.exists(LIBRARY_CONFIG):
+            start = time.perf_counter()
+            doc = yaml.load(open(LIBRARY_CONFIG, 'r'))
             global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT
-            first_document = all_yaml_docs[0]
-            KINDLE_ROOT = first_document["General"]["kindle_root"]
-            LIBRARY_ROOT = first_document["General"]["library_root"]
-            SCRAPE_ROOT = first_document["General"]["scrape_root"]
-            BACKUP_IMPORTED_EBOOKS = first_document["General"]["backup_imported_ebooks"]
+            KINDLE_ROOT = doc["kindle_root"]
+            LIBRARY_ROOT = doc["library_root"]
+            SCRAPE_ROOT = doc["scrape_root"]
+            BACKUP_IMPORTED_EBOOKS = doc["backup_imported_ebooks"]
             refresh_global_variables()
             global AUTHOR_ALIASES
-            AUTHOR_ALIASES = first_document["General"]["author_aliases"]
+            AUTHOR_ALIASES = doc["author_aliases"]
+            print("Config opened in %.3fs."%(time.perf_counter() - start))
 
-            # the rest
+        # ebooks
+        if os.path.exists(LIBRARY_DB):
+            start = time.perf_counter()
+            everything = marshal.load(open(LIBRARY_DB, 'rb')) #, 'utf8')
+
             with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
-                future_to_ebook = { executor.submit(self._load_ebook, doc): doc for doc in all_yaml_docs[1:]}
+                future_to_ebook = { executor.submit(self._load_ebook, everything, filename): filename for filename in list(everything.keys())}
                 for future in concurrent.futures.as_completed(future_to_ebook):
                     success, ebook = future.result()
                     if success:
                         self.ebooks.append(ebook)
-            print("Database opened in %.2fs."%(time.perf_counter() - start))
+
+            print("Database opened in %.3fs."%(time.perf_counter() - start))
 
     def _refresh_ebook(self, full_path, old_db):
         is_already_in_db = False
@@ -264,10 +271,13 @@ class Library(object):
         for root, dirs, files in os.walk(LIBRARY_DIR):
             all_ebooks_in_library_dir.extend([os.path.join(root, el) for el in files if el.lower().endswith(".epub") or el.lower().endswith(".mobi")])
 
+        cpt = 1
         with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
             future_to_ebook = { executor.submit(self._refresh_ebook, path, old_db): path for path in all_ebooks_in_library_dir}
             for future in concurrent.futures.as_completed(future_to_ebook):
                 if future.result() is not None:
+                    print(" %.2f%%"%( 100*cpt/len(all_ebooks_in_library_dir)), end="\r", flush=True)
+                    cpt += 1
                     self.ebooks.append( future.result() )
 
         to_delete = [ eb for eb in old_db if eb not in self.ebooks]
@@ -280,16 +290,14 @@ class Library(object):
 
     def save_db(self):
         start = time.process_time()
-        # General section
-        all_ebooks = [{ "General": { "kindle_root": KINDLE_ROOT, "library_root": LIBRARY_ROOT,
-                                    "backup_imported_ebooks": BACKUP_IMPORTED_EBOOKS,
-                                    "scrape_root": SCRAPE_ROOT, "author_aliases": AUTHOR_ALIASES }}]
+        data = {}
         # adding ebooks in alphabetical order
         for ebook in sorted(self.ebooks, key=lambda x: x.filename):
-            all_ebooks.append(ebook.to_dict())
+            data[ebook.filename] = ebook.to_dict()
 
-        stream = open(LIBRARY_DB, 'w')
-        yaml.dump_all(all_ebooks, stream, default_flow_style=False, allow_unicode=True)
+        with open(LIBRARY_DB, "w+b") as data_file:
+            #data_file.write(json.dumps( data, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
+            data_file.write(marshal.dumps( data))
         print("Database saved in %.2fs."%(time.process_time() - start))
 
     def update_kindle_collections(self, outfile):
@@ -310,6 +318,7 @@ class Library(object):
     def scrape_dir_for_ebooks(self):
         start = time.perf_counter()
         all_ebooks_in_scrape_dir = []
+        print("Finding ebooks in %s..."%SCRAPE_ROOT)
         for root, dirs, files in os.walk(SCRAPE_ROOT):
             all_ebooks_in_scrape_dir.extend([os.path.join(root, el) for el in files if el.lower().endswith(".epub") or el.lower().endswith(".mobi")])
 
@@ -399,6 +408,9 @@ class Library(object):
 
     def sync_with_kindle(self):
         print("Syncing with kindle.")
+        if not os.path.exists(KINDLE_ROOT):
+            print("Kindle is not connected/mounted. Abandon ship.")
+            return
         start = time.perf_counter()
         # lister les mobi sur le kindle
         print(" -> Listing existing ebooks.")
@@ -408,10 +420,13 @@ class Library(object):
 
         # sync books / convert to mobi
         print(" -> Syncing library.")
+        cpt = 1
         with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
-            all_sync = { executor.submit(eb.sync_with_kindle): eb for eb in self.ebooks}
+            all_sync = { executor.submit(eb.sync_with_kindle): eb for eb in sorted(self.ebooks, key=lambda x: x.filename)}
             for future in concurrent.futures.as_completed(all_sync):
                 ebook = all_sync[future]
+                print(" %.2f%%"%( 100*cpt/len(self.ebooks)), end="\r", flush=True)
+                cpt += 1
                 # remove ebook from list (exporting previously exported ebook)
                 if os.path.join(KINDLE_DOCUMENTS, ebook.exported_filename) in all_mobi_ebooks:
                     all_mobi_ebooks.remove( os.path.join(KINDLE_DOCUMENTS, ebook.exported_filename) )
@@ -490,6 +505,16 @@ if __name__ == "__main__":
                         eb.tags.append(new_tag)
                     else:
                         print(" -> ", eb, "already tagged as", new_tag, ", nothing to do.")
+            if "d" in arg:
+                assert len(sys.argv) >=4
+                tag_to_remove = sys.argv[3].lower()
+                for eb in filtered:
+                    if tag_to_remove in eb.tags:
+                        print(" -> ", eb, "removed as", tag_to_remove)
+                        eb.tags.remove(tag_to_remove)
+                    else:
+                        print(" -> ", eb, "not tagged as", tag_to_remove, ", nothing to do.")
+
         if "u" in arg:
             if len(sys.argv) == 3:
                 filtered = l.search_tag(sys.argv[2])
