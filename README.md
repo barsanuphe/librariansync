@@ -35,7 +35,7 @@ librarian
 
 ### Configuration
 
-*librarian.py* uses a file, library.yaml, for both configuration and ebook database.
+*librarian.py* uses a configuration file, librarian.yaml.
 
 To begin, a minimal example configuration would be:
 
@@ -49,22 +49,8 @@ To begin, a minimal example configuration would be:
         library_root: /home/login/ebooks
         scrape_root: /home/login/documents
 
-After ebooks are imported, each will have an entry (as a YAML document), such as:
-
-    Alexandre Dumas/Alexandre Dumas (1844) Les Trois Mousquetaires.epub:
-        author: Alexandre Dumas
-        converted_to_mobi_from_hash: faaf34fa7753bee6722fe75066857266a32d1116
-        converted_to_mobi_hash: e6278980d4fb66c9c05c4edebdcdc57f37a4dbf8
-        date: 1844
-        format: epub
-        last_synced_hash: e6278980d4fb66c9c05c4edebdcdc57f37a4dbf8
-        path: /home/login/ebooks/library/Alexandre Dumas/Alexandre
-            Dumas (2004) Les Trois Mousquetaires.epub
-        tags: gutenberg,french,already read
-        title: Les Trois Mousquetaires
-
-Only the "tags" section should be edited manually, and is originally blank after import. Each tag will
-be transformed into a Kindle collection by Librarian Sync.
+Imported ebooks are kept in a Python dictionary saved and loaded with the marshal module, in library.db.
+Until proven otherwise, it seems quick enough.
 
 ### Usage
 
@@ -74,8 +60,12 @@ Launch with python3, with the (non-exclusive) options:
 - **i**: import ebooks
 - **r**: refresh database
 - **k**: sync with Kindle
+- **f** *STRING*: filter and display ebooks containing *STRING* in either its author's name or its title.
+- **ft** *STRING* *STRING*: same as **f** but tags the result as the second *STRING*.
+- **fd** *STRING *STRING*: same as **f** but removes the result from the tag of the second *STRING*.
+- **u** *[STRING]*: filter and display ebooks containing *STRING* among its tags. If *STRING* is omitted, displays all ebooks yet untagged.
 
-*python librarian.py irks* will do all of the above.
+*python librarian.py irks* will scrape all ebooks, import them, refresh the database then sync everything to the Kindle.
 
 While syncing with Kindle, *librarian.py* will keep track of previous conversions to the mobi format (for epub ebooks),
 and of previously synced ebooks on the Kindle, and will try to work no more than necessary.
