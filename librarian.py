@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
-#TODO: check if python3 is used, but SyntexError raised if run with python2
 
+
+from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, codecs, sys, hashlib, time, concurrent.futures, multiprocessing, marshal
+
+import sys
+if sys.version_info<(3,0,0):
+  sys.stderr.write("You need python 3.0 or later to run this script.\n")
+  exit(-1)
 
 try:
     assert subprocess.call("ebook-meta --version", shell=True, stdout=subprocess.DEVNULL) == 0
@@ -18,14 +24,13 @@ except Exception as err:
     print("pyyaml (for python3) must be installed!")
     sys.exit(-1)
 
-
-BACKUP_IMPORTED_EBOOKS = True
-SCRAPE_ROOT = ""
-KINDLE_DOCUMENTS_SUBDIR = "library"  #TODO: yaml option
-
-# library is located next to this script
+# library & config are located next to this script
 LIBRARY_DB = os.path.join(os.path.dirname(os.path.realpath(__file__)), "library.db")
 LIBRARY_CONFIG = os.path.join(os.path.dirname(os.path.realpath(__file__)), "librarian.yaml")
+
+BACKUP_IMPORTED_EBOOKS = True
+SCRAPE_ROOT = None
+KINDLE_DOCUMENTS_SUBDIR = "library"
 AUTHOR_ALIASES = {}
 
 def refresh_global_variables():
@@ -219,6 +224,7 @@ class Ebook(object):
 class Library(object):
     def __init__(self):
         self.ebooks = []
+        self.open_config()
 
     def _load_ebook(self, everything, filename):
         if not "path" in list(everything[filename].keys()):
@@ -226,34 +232,37 @@ class Library(object):
         eb = Ebook(everything[filename]["path"])
         return eb.try_to_load_from_json(everything, filename), eb
 
-    def open_db(self):
-        self.db = []
-
+    def open_config(self):
         #configuration
         if os.path.exists(LIBRARY_CONFIG):
             start = time.perf_counter()
             doc = yaml.load(open(LIBRARY_CONFIG, 'r'))
+            global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT, AUTHOR_ALIASES, KINDLE_DOCUMENTS_SUBDIR
             try:
-                global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT
                 KINDLE_ROOT = doc["kindle_root"]
                 LIBRARY_ROOT = doc["library_root"]
-                SCRAPE_ROOT = doc["scrape_root"]
+
+                if "kindle_documents_subdir" in list(doc.keys()):
+                    KINDLE_DOCUMENTS_SUBDIR = doc["kindle_documents_subdir"] #TODO check if valid name
+
                 refresh_global_variables()
             except Exception as err:
                 print("Missing config option: ", err)
                 raise Exception("Invalid configuration file!")
 
+            if "scrape_root" in list(doc.keys()):
+                SCRAPE_ROOT = doc["scrape_root"]
             if "backup_imported_ebooks" in list(doc.keys()):
                 BACKUP_IMPORTED_EBOOKS = doc["backup_imported_ebooks"]
             if "author_aliases" in list(doc.keys()):
-                global AUTHOR_ALIASES
                 AUTHOR_ALIASES = doc["author_aliases"]
             print("Config opened in %.3fs."%(time.perf_counter() - start))
 
-        # ebooks
+    def open_db(self):
+        self.db = []
         if os.path.exists(LIBRARY_DB):
             start = time.perf_counter()
-            everything = marshal.load(open(LIBRARY_DB, 'rb')) #, 'utf8')
+            everything = marshal.load(open(LIBRARY_DB, 'rb'))
 
             with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
                 future_to_ebook = { executor.submit(self._load_ebook, everything, filename): filename for filename in list(everything.keys())}
@@ -262,7 +271,7 @@ class Library(object):
                     if success:
                         self.ebooks.append(ebook)
 
-            print("Database opened in %.3fs."%(time.perf_counter() - start))
+            print("Database opened in %.3fs: loaded %s ebooks."%( (time.perf_counter() - start), len(self.ebooks) ))
 
     def _refresh_ebook(self, full_path, old_db):
         is_already_in_db = False
@@ -320,7 +329,7 @@ class Library(object):
     def update_kindle_collections(self, outfile):
         # generates the json file that is used
         # by the kual script in librariansync/
-        print("Building kindle collections from tags.")
+        #print("Building kindle collections from tags.")
         tags_json = "{\n"
         for eb in sorted(self.ebooks, key=lambda x: x.filename):
             if eb.tags != [""]:
@@ -333,6 +342,10 @@ class Library(object):
         f.close()
 
     def scrape_dir_for_ebooks(self):
+        if SCRAPE_ROOT is None:
+            print("scrape_root not defined in librarian.yaml, nothing to do.")
+            return
+
         start = time.perf_counter()
         all_ebooks_in_scrape_dir = []
         print("Finding ebooks in %s..."%SCRAPE_ROOT)
@@ -437,7 +450,7 @@ class Library(object):
 
         # sync books / convert to mobi
         print(" -> Syncing library.")
-        cpt = 1
+        cpt = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
             all_sync = { executor.submit(eb.sync_with_kindle): eb for eb in sorted(self.ebooks, key=lambda x: x.filename)}
             for future in concurrent.futures.as_completed(all_sync):
@@ -458,7 +471,7 @@ class Library(object):
         print(" -> Generating and copying database for collection generation.")
         self.update_kindle_collections(COLLECTIONS)
         shutil.copy(COLLECTIONS, KINDLE_EXTENSIONS)
-        print("Library synced to kindle in in %.2fs."%(time.perf_counter() - start))
+        print("Library synced to kindle in %.2fs."%(time.perf_counter() - start))
 
     def list_incomplete_metadata(self):
         found_incomplete = False
@@ -493,9 +506,9 @@ class Library(object):
 
 if __name__ == "__main__":
 
-    l = Library()
 
     try:
+        l = Library()
         l.open_db()
     except Exception as err:
         print("Error loading DB: ", err)

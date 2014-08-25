@@ -45,9 +45,12 @@ To begin, a minimal example configuration would be:
             China Mieville: China Miéville
             Richard Morgan: Richard K. Morgan
         backup_imported_ebooks: true
+        kindle_documents_subdir: library
         kindle_root: /run/media/login/Kindle
         library_root: /home/login/ebooks
         scrape_root: /home/login/documents
+
+*kindle_root* and *library_root* are mandatory. The rest is optional.
 
 Imported ebooks are kept in a Python dictionary saved and loaded with the marshal module, in library.db.
 Until proven otherwise, it seems quick enough.
