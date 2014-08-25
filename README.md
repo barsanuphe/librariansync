@@ -57,18 +57,39 @@ Until proven otherwise, it seems quick enough.
 
 ### Usage
 
-Launch with python3, with the (non-exclusive) options:
+Note: if python2 is the default version on your Linux distribution, launch with *python3 librarian.py*.
 
-- **s**: scrape directory
-- **i**: import ebooks
-- **r**: refresh database
-- **k**: sync with Kindle
-- **f** *STRING*: filter and display ebooks containing *STRING* in either its author's name or its title.
-- **ft** *STRING* *STRING*: same as **f** but tags the result as the second *STRING*.
-- **fd** *STRING *STRING*: same as **f** but removes the result from the tag of the second *STRING*.
-- **u** *[STRING]*: filter and display ebooks containing *STRING* among its tags. If *STRING* is omitted, displays all ebooks yet untagged.
+    $ python librarian.py -h
+    usage: librarian.py [-h] [-i] [-r] [-s] [-k] [-f [STRING [STRING ...]]]
+                        [-l [STRING [STRING ...]]] [-t ADD_TAG [ADD_TAG ...]]
+                        [-d DELETE_TAG [DELETE_TAG ...]] [-c]
 
-*python librarian.py irks* will scrape all ebooks, import them, refresh the database then sync everything to the Kindle.
+    Librarian.
+
+    optional arguments:
+    -h, --help            show this help message and exit
+
+    Library management:
+    Import, analyze, and sync with Kindle.
+
+    -i, --import          import ebooks
+    -r, --refresh         refresh library
+    -s, --scrape          scrape for ebooks
+    -k, --sync-kindle     sync library with kindle
+
+    Tagging:
+    Search and tag ebooks. Filters can begin with author:, title:, tag: for a
+    more precise search.
+
+    -f [STRING [STRING ...]], --filter [STRING [STRING ...]]
+                            list ebooks in library matching ALL patterns
+    -l [STRING [STRING ...]], --list [STRING [STRING ...]]
+                            list ebooks in library matching ANY pattern
+    -t ADD_TAG [ADD_TAG ...], --add-tag ADD_TAG [ADD_TAG ...]
+                            tag listed ebooks in library
+    -d DELETE_TAG [DELETE_TAG ...], --delete-tag DELETE_TAG [DELETE_TAG ...]
+                            remove tag(s) from listed ebooks in library
+    -c, --collections     list all tags
 
 While syncing with Kindle, *librarian.py* will keep track of previous conversions to the mobi format (for epub ebooks),
 and of previously synced ebooks on the Kindle, and will try to work no more than necessary.

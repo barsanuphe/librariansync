@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
-
+#TODO: list untagged!
+#TODO: sync filtered
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
-import os, subprocess, shutil, codecs, sys, hashlib, time, concurrent.futures, multiprocessing, marshal
+import os, subprocess, shutil, codecs, sys, hashlib
+import time, concurrent.futures, multiprocessing, marshal, argparse
 
 import sys
 if sys.version_info<(3,0,0):
@@ -75,7 +77,7 @@ class Ebook(object):
 
     @property
     def filename(self):
-        return "%s.%s"%(str(self), self.format.lower())
+        return "%s/%s (%s) %s.%s"%(self.author, self.author, self.date, self.title, self.format.lower())
 
     @property
     def exported_filename(self):
@@ -119,8 +121,7 @@ class Ebook(object):
 
     def rename_from_metadata(self):
         if self.is_metadata_complete and LIBRARY_DIR in self.path:
-            new_filename = "%s.%s"%(str(self), self.format.lower())
-            new_name = os.path.join(LIBRARY_DIR, new_filename)
+            new_name = os.path.join(LIBRARY_DIR, self.filename)
             if new_name != self.path:
                 if not os.path.exists( os.path.dirname(new_name) ):
                     print("Creating directory", os.path.dirname(new_name) )
@@ -188,7 +189,10 @@ class Ebook(object):
         self.last_synced_hash = self.converted_to_mobi_hash
 
     def __str__(self):
-        return "%s/%s (%s) %s"%(self.author, self.author, self.date, self.title)
+        if self.tags == []:
+            return "%s (%s) %s"%(self.author, self.date, self.title)
+        else:
+            return "%s (%s) %s -- %s"%(self.author, self.date, self.title, ", ".join(self.tags))
 
     def to_dict(self):
         return  {
@@ -211,7 +215,7 @@ class Ebook(object):
             self.author = everything[filename]['author']
             self.title = everything[filename]['title']
             self.format = everything[filename]['format']
-            self.tags = [el.strip() for el in everything[filename]['tags'].split(",") if el.strip() != ""]
+            self.tags = [el.lower().strip() for el in everything[filename]['tags'].split(",") if el.strip() != ""]
             self.date = everything[filename]['date']
             self.converted_to_mobi_hash = everything[filename]['converted_to_mobi_hash']
             self.converted_to_mobi_from_hash = everything[filename]['converted_to_mobi_from_hash']
@@ -235,7 +239,6 @@ class Library(object):
     def open_config(self):
         #configuration
         if os.path.exists(LIBRARY_CONFIG):
-            start = time.perf_counter()
             doc = yaml.load(open(LIBRARY_CONFIG, 'r'))
             global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT, AUTHOR_ALIASES, KINDLE_DOCUMENTS_SUBDIR
             try:
@@ -256,7 +259,6 @@ class Library(object):
                 BACKUP_IMPORTED_EBOOKS = doc["backup_imported_ebooks"]
             if "author_aliases" in list(doc.keys()):
                 AUTHOR_ALIASES = doc["author_aliases"]
-            print("Config opened in %.3fs."%(time.perf_counter() - start))
 
     def open_db(self):
         self.db = []
@@ -271,7 +273,7 @@ class Library(object):
                     if success:
                         self.ebooks.append(ebook)
 
-            print("Database opened in %.3fs: loaded %s ebooks."%( (time.perf_counter() - start), len(self.ebooks) ))
+            print("Database opened in %.2fs: loaded %s ebooks."%( (time.perf_counter() - start), len(self.ebooks) ))
 
     def _refresh_ebook(self, full_path, old_db):
         is_already_in_db = False
@@ -324,7 +326,7 @@ class Library(object):
         with open(LIBRARY_DB, "w+b") as data_file:
             #data_file.write(json.dumps( data, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
             data_file.write(marshal.dumps( data))
-        print("Database saved in %.2fs."%(time.process_time() - start))
+        #print("Database saved in %.2fs."%(time.process_time() - start))
 
     def update_kindle_collections(self, outfile):
         # generates the json file that is used
@@ -457,7 +459,7 @@ class Library(object):
                 ebook = all_sync[future]
                 print(" %.2f%%"%( 100*cpt/len(self.ebooks)), end="\r", flush=True)
                 cpt += 1
-                # remove ebook from list (exporting previously exported ebook)
+                # remove ebook from the list of previously exported ebooks
                 if os.path.join(KINDLE_DOCUMENTS, ebook.exported_filename) in all_mobi_ebooks:
                     all_mobi_ebooks.remove( os.path.join(KINDLE_DOCUMENTS, ebook.exported_filename) )
 
@@ -485,27 +487,81 @@ class Library(object):
             print(incomplete_list)
         return found_incomplete
 
-    def search(self, search_string):
+    def search_ebooks(self, search_string):
         filtered = []
+        search_string = search_string.lower()
         for eb in self.ebooks:
-            if search_string.lower() in eb.author.lower() or search_string.lower() in eb.title.lower():
-                print(" -> ", eb)
+            if search_string.startswith("author:"):
+                if search_string.split("author:")[1].strip() in eb.author.lower():
+                    filtered.append(eb)
+            elif search_string.startswith("title:"):
+                if search_string.split("title:")[1].strip() in eb.title.lower():
+                    filtered.append(eb)
+            elif search_string.startswith("tag:"):
+                tag_to_search_for = search_string.split("tag:")[1].strip()
+                for tag in eb.tags:
+                    if tag_to_search_for in tag:
+                        filtered.append(eb)
+                        break # at least one match is good enough
+            elif search_string.lower() in eb.author.lower() or search_string.lower() in eb.title.lower() or search_string.lower() in eb.tags:
                 filtered.append(eb)
         return filtered
 
-    def search_tag(self, search_tag_string=None):
-        filtered = []
-        for eb in self.ebooks:
-            if search_tag_string == None and eb.tags in [[], [""]]:
-                print(" -> ", eb, " is untagged")
-                filtered.append(eb)
-            elif search_tag_string != None and search_tag_string.lower() in eb.tags:
-                print(" -> ", eb)
-                filtered.append(eb)
-        return filtered
+    def search(self, search_list, additive=False):
+        complete_filtered_list_or = []
+        complete_filtered_list_and = []
+        out = []
+
+        if search_list == []:
+            out = self.ebooks
+        else:
+            for library_filter in search_list:
+                filtered = l.search_ebooks(library_filter)
+                complete_filtered_list_or.extend([el for el in filtered if el not in complete_filtered_list_or])
+                if complete_filtered_list_and == []:
+                    complete_filtered_list_and = filtered
+                else:
+                    complete_filtered_list_and = [el for el in complete_filtered_list_and if el in filtered]
+            if additive:
+                out =  complete_filtered_list_and
+            else:
+                out =  complete_filtered_list_or
+        return sorted(out, key=lambda x: x.filename)
+
+    def list_tags(self):
+        all_tags = {}
+        for ebook in self.ebooks:
+            for tag in ebook.tags:
+                if tag in list(all_tags.keys()):
+                    all_tags[tag] += 1
+                else:
+                    all_tags[tag] = 1
+        return all_tags
 
 if __name__ == "__main__":
 
+    start = time.perf_counter()
+
+    parser = argparse.ArgumentParser(description='Librarian.')
+
+    group_import_export = parser.add_argument_group('Library management', 'Import, analyze, and sync with Kindle.')
+    group_import_export.add_argument('-i', '--import', dest='import_ebooks', action='store_true', default = False, help='import ebooks')
+    group_import_export.add_argument('-r', '--refresh', dest='refresh', action='store_true', default = False, help='refresh library')
+    group_import_export.add_argument('-s', '--scrape', dest='scrape', action='store_true', default = False, help='scrape for ebooks')
+    group_import_export.add_argument('-k', '--sync-kindle', dest='kindle', action='store_true', default = False, help='sync library with kindle')
+
+    group_tagging = parser.add_argument_group('Tagging', 'Search and tag ebooks. Filters can begin with author:, title:, tag: for a more precise search.')
+    group_tagging.add_argument('-f', '--filter', dest='filter_ebooks_and', action='store', nargs="*", metavar="STRING", help='list ebooks in library matching ALL patterns')
+    group_tagging.add_argument('-l', '--list', dest='filter_ebooks_or', action='store', nargs="*", metavar="STRING", help='list ebooks in library matching ANY pattern')
+    group_tagging.add_argument('-t', '--add-tag', dest='add_tag', action='store', nargs="+", help='tag listed ebooks in library')
+    group_tagging.add_argument('-d', '--delete-tag', dest='delete_tag', action='store', nargs="+", help='remove tag(s) from listed ebooks in library')
+    group_tagging.add_argument('-c', '--collections', dest='collections', action='store_true', help='list all tags')
+
+    args = parser.parse_args()
+
+    if (args.add_tag is not None or args.delete_tag is not None) and (args.filter_ebooks_and is None or args.filter_ebooks_and == []) and (args.filter_ebooks_or is None or args.filter_ebooks_or == []) :
+        print("Tagging all ebooks, or removing a tag from all ebooks, arguably makes no sense. Use the --list_and/--list_or options to filter among the library.")
+        sys.exit()
 
     try:
         l = Library()
@@ -515,49 +571,51 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     try:
-        arg = sys.argv[1].lower()
-        if "s" in arg:
+        if args.scrape:
             l.scrape_dir_for_ebooks()
-        if "i" in arg:
+        if args.import_ebooks:
             if l.import_new_ebooks():
-                arg += "r" # force refresh after successful import
-        if "r" in arg:
+                args.refresh = True
+        if args.refresh:
             some_are_incomplete = l.refresh_db()
             if some_are_incomplete:
                 print("Fix metadata for these ebooks and run this again.")
                 sys.exit(-1)
-        if "k" in arg:
+        if args.kindle:
             l.sync_with_kindle()
-        if "f" in arg:
-            assert len(sys.argv) >= 3 and len(sys.argv[2]) > 3
-            filtered = l.search(sys.argv[2])
-            if "t" in arg:
-                assert len(sys.argv) >=4
-                new_tag = sys.argv[3].lower()
-                for eb in filtered:
-                    if new_tag not in eb.tags:
-                        print(" -> ", eb, "tagged as", new_tag)
-                        eb.tags.append(new_tag)
-                    else:
-                        print(" -> ", eb, "already tagged as", new_tag, ", nothing to do.")
-            if "d" in arg:
-                assert len(sys.argv) >=4
-                tag_to_remove = sys.argv[3].lower()
-                for eb in filtered:
-                    if tag_to_remove in eb.tags:
-                        print(" -> ", eb, "removed as", tag_to_remove)
-                        eb.tags.remove(tag_to_remove)
-                    else:
-                        print(" -> ", eb, "not tagged as", tag_to_remove, ", nothing to do.")
 
-        if "u" in arg:
-            if len(sys.argv) == 3:
-                filtered = l.search_tag(sys.argv[2])
-            elif len(sys.argv) == 2:
-                filtered = l.search_tag()
+        if args.collections:
+            all_tags = l.list_tags()
+            for tag in sorted(list(all_tags.keys())):
+                print(" -> %s (%s)"%(tag, all_tags[tag]))
+
+        # filtering
+        filtered = []
+        if args.filter_ebooks_and is not None:
+            filtered = l.search(args.filter_ebooks_and, additive = True)
+        elif args.filter_ebooks_or is not None:
+            filtered = l.search(args.filter_ebooks_or, additive = False)
+
+        # add/remove tags
+        if args.add_tag is not None and filtered != []:
+            tags = [el.lower() for el in args.add_tag] # sanitize
+            for ebook in filtered:
+                for tag in tags:
+                    if tag not in ebook.tags:
+                        ebook.tags.append(tag)
+        if args.delete_tag is not None and filtered != []:
+            tags = [el.lower() for el in args.delete_tag] # sanitize
+            for ebook in filtered:
+                for tag in tags:
+                    if tag in ebook.tags:
+                        ebook.tags.remove(tag)
+
+        for ebook in filtered:
+            print(" -> ", ebook)
 
     except Exception as err:
         print(err)
         sys.exit(-1)
 
     l.save_db()
+    print("Everything done in %.2fs."%(time.perf_counter() - start))
