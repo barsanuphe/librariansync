@@ -6,7 +6,7 @@
 #TODO: -x: exclude from filter
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
-import os, subprocess, shutil, codecs, sys, hashlib
+import os, subprocess, shutil, sys, hashlib
 import time, concurrent.futures, multiprocessing, json, argparse
 
 import sys
@@ -35,6 +35,7 @@ BACKUP_IMPORTED_EBOOKS = True
 SCRAPE_ROOT = None
 KINDLE_DOCUMENTS_SUBDIR = "library"
 AUTHOR_ALIASES = {}
+WANTED = {}
 
 def refresh_global_variables():
     global IMPORT_DIR, IMPORTED_DIR, LIBRARY_DIR, KINDLE_DIR, COLLECTIONS, LIBRARY_ROOT
@@ -240,26 +241,31 @@ class Library(object):
     def open_config(self):
         #configuration
         if os.path.exists(LIBRARY_CONFIG):
-            doc = yaml.load(open(LIBRARY_CONFIG, 'r'))
-            global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT, AUTHOR_ALIASES, KINDLE_DOCUMENTS_SUBDIR
+            self.config = yaml.load(open(LIBRARY_CONFIG, 'r'))
+            global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT, AUTHOR_ALIASES, KINDLE_DOCUMENTS_SUBDIR, WANTED
             try:
-                KINDLE_ROOT = doc["kindle_root"]
-                LIBRARY_ROOT = doc["library_root"]
+                KINDLE_ROOT = self.config["kindle_root"]
+                LIBRARY_ROOT = self.config["library_root"]
 
-                if "kindle_documents_subdir" in list(doc.keys()):
-                    KINDLE_DOCUMENTS_SUBDIR = doc["kindle_documents_subdir"] #TODO check if valid name
+                if "kindle_documents_subdir" in list(self.config.keys()):
+                    KINDLE_DOCUMENTS_SUBDIR = self.config["kindle_documents_subdir"] #TODO check if valid name
 
                 refresh_global_variables()
             except Exception as err:
                 print("Missing config option: ", err)
                 raise Exception("Invalid configuration file!")
 
-            if "scrape_root" in list(doc.keys()):
-                SCRAPE_ROOT = doc["scrape_root"]
-            if "backup_imported_ebooks" in list(doc.keys()):
-                BACKUP_IMPORTED_EBOOKS = doc["backup_imported_ebooks"]
-            if "author_aliases" in list(doc.keys()):
-                AUTHOR_ALIASES = doc["author_aliases"]
+            if "scrape_root" in list(self.config.keys()):
+                SCRAPE_ROOT = self.config["scrape_root"]
+            if "backup_imported_ebooks" in list(self.config.keys()):
+                BACKUP_IMPORTED_EBOOKS = self.config["backup_imported_ebooks"]
+            if "author_aliases" in list(self.config.keys()):
+                AUTHOR_ALIASES = self.config["author_aliases"]
+            if "wanted" in list(self.config.keys()):
+                WANTED = self.config["wanted"]
+
+    def save_config(self):
+        yaml.dump(self.config, open(LIBRARY_CONFIG, 'w'), indent=4, default_flow_style=False, allow_unicode=True)
 
     def open_db(self):
         self.db = []
@@ -313,6 +319,16 @@ class Library(object):
         to_delete = [ eb for eb in old_db if eb not in self.ebooks]
         for eb in to_delete:
            print(" -> DELETED EBOOK: ", eb)
+
+        if WANTED != {}:
+            for ebook in self.ebooks:
+                if ebook.author in list(WANTED.keys()) and WANTED[ebook.author] in ebook.title:
+                    print("Found WANTED ebook: %s - %s "%(ebook.author,WANTED[ebook.author]) )
+                    answer = input("Confirm this is what you were looking for: %s\ny/n? "%ebook)
+                    if answer.lower() == "y":
+                        print("Removing from wanted list.")
+                        del WANTED[ebook.author]
+                        self.save_config()
 
         is_incomplete = self.list_incomplete_metadata()
         print("Database refreshed in %.2fs."%(time.perf_counter() - start))
