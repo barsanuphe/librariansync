@@ -3,10 +3,11 @@
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
 #TODO: list untagged!
 #TODO: sync filtered
+#TODO: -x: exclude from filter
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, codecs, sys, hashlib
-import time, concurrent.futures, multiprocessing, marshal, argparse
+import time, concurrent.futures, multiprocessing, json, argparse
 
 import sys
 if sys.version_info<(3,0,0):
@@ -27,7 +28,7 @@ except Exception as err:
     sys.exit(-1)
 
 # library & config are located next to this script
-LIBRARY_DB = os.path.join(os.path.dirname(os.path.realpath(__file__)), "library.db")
+LIBRARY_DB = os.path.join(os.path.dirname(os.path.realpath(__file__)), "library.json")
 LIBRARY_CONFIG = os.path.join(os.path.dirname(os.path.realpath(__file__)), "librarian.yaml")
 
 BACKUP_IMPORTED_EBOOKS = True
@@ -264,7 +265,7 @@ class Library(object):
         self.db = []
         if os.path.exists(LIBRARY_DB):
             start = time.perf_counter()
-            everything = marshal.load(open(LIBRARY_DB, 'rb'))
+            everything = json.load(open(LIBRARY_DB, 'r'))
 
             with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
                 future_to_ebook = { executor.submit(self._load_ebook, everything, filename): filename for filename in list(everything.keys())}
@@ -272,8 +273,9 @@ class Library(object):
                     success, ebook = future.result()
                     if success:
                         self.ebooks.append(ebook)
-
             print("Database opened in %.2fs: loaded %s ebooks."%( (time.perf_counter() - start), len(self.ebooks) ))
+        else:
+            print("No DB, refresh!")
 
     def _refresh_ebook(self, full_path, old_db):
         is_already_in_db = False
@@ -317,16 +319,13 @@ class Library(object):
         return is_incomplete
 
     def save_db(self):
-        start = time.process_time()
         data = {}
         # adding ebooks in alphabetical order
         for ebook in sorted(self.ebooks, key=lambda x: x.filename):
             data[ebook.filename] = ebook.to_dict()
 
-        with open(LIBRARY_DB, "w+b") as data_file:
-            #data_file.write(json.dumps( data, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
-            data_file.write(marshal.dumps( data))
-        #print("Database saved in %.2fs."%(time.process_time() - start))
+        with open(LIBRARY_DB, "w") as data_file:
+            data_file.write(json.dumps( data, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
 
     def update_kindle_collections(self, outfile):
         # generates the json file that is used
@@ -558,6 +557,10 @@ if __name__ == "__main__":
     group_tagging.add_argument('-c', '--collections', dest='collections', action='store_true', help='list all tags')
 
     args = parser.parse_args()
+
+    if not len(sys.argv) > 1:
+        print("No option selected. Try -h.")
+        sys.exit()
 
     if (args.add_tag is not None or args.delete_tag is not None) and (args.filter_ebooks_and is None or args.filter_ebooks_and == []) and (args.filter_ebooks_or is None or args.filter_ebooks_or == []) :
         print("Tagging all ebooks, or removing a tag from all ebooks, arguably makes no sense. Use the --list_and/--list_or options to filter among the library.")

@@ -1,7 +1,8 @@
 librarian
 =========
 
-Ebook manager that can sync to a Kindle Paperwhite and automatically create collections.
+Ebook manager that can sync to a Kindle Paperwhite and automatically create collections from tags.
+Only epub and mobi ebooks are considered, with a preference for epub.
 
 There is no guarantee that this will be useful to anyone but myself.
 
@@ -10,18 +11,12 @@ what it does
 
 This is made of two parts:
 
-- *librarian.py*, which can import ebooks, rename them from metadata, convert them to mobi, and sync with a Kindle Paperwhite.
-- *Librarian Sync*, which is run on the Kindle, to build automatically the collections created with librarian.py.
+- *librarian.py*:
+    which can import ebooks, rename them from metadata, convert them to mobi, and sync with a Kindle Paperwhite.
+    It can also perform basic search and add and remove tags.
 
-*librarian.py *uses several special folders, as specified in the configuration file:
-
-- *library_root*: where all ebooks are kept. More specifically, it will be divided in subfolders:
-    - **import**: temporary place to dump ebooks before they are imported into the library proper
-    - **imported**: when an ebook is imported (and renamed), a copy of the original is optionnally placed here.
-    - **kindle**: a mirror of the library, with all epubs converted into mobis. This is what will be synced with the Kindle.
-    - **library**: where all imported ebooks are safely kept.
-- *kindle_root*: where the Kindle is mounted when it is connected by USB. This may depend on your Linux distribution.
-- *scrape_root*: if you have ebooks lying around on a drive at random, for example, scraping it will copy them all into the import subfolder.
+- *Librarian Sync*:
+    runs on the Kindle, and can automatically build the collections based on the tags added with librarian.py.
 
 
 librarian
@@ -35,25 +30,31 @@ librarian
 
 ### Configuration
 
-*librarian.py* uses a configuration file, librarian.yaml.
+*librarian.py *uses several special folders, as specified in the configuration file *librarian.yaml*:
 
-To begin, a minimal example configuration would be:
+- *library_root*: where all ebooks are kept. More specifically, it will be divided in subfolders:
+    - **import**: temporary place to dump ebooks before they are imported into the library proper
+    - **imported**: when an ebook is imported (and renamed), a copy of the original is optionnally placed here.
+    - **kindle**: a mirror of the library, with all epubs converted into mobis. This is what will be synced with the Kindle.
+    - **library**: where all imported ebooks are safely kept.
+- *kindle_root*: where the Kindle is mounted when it is connected by USB. This may depend on your Linux distribution.
+- *scrape_root*: if you have ebooks lying around on a drive at random, for example, scraping it will copy them all into the import subfolder.
 
-    General:
-        author_aliases:
-            Alexandre Dumas Père: Alexandre Dumas
-            China Mieville: China Miéville
-            Richard Morgan: Richard K. Morgan
-        backup_imported_ebooks: true
-        kindle_documents_subdir: library
-        kindle_root: /run/media/login/Kindle
-        library_root: /home/login/ebooks
-        scrape_root: /home/login/documents
+An example configuration would be:
+
+    author_aliases:
+        Alexandre Dumas Père: Alexandre Dumas
+        China Mieville: China Miéville
+        Richard Morgan: Richard K. Morgan
+    backup_imported_ebooks: true
+    kindle_documents_subdir: library
+    kindle_root: /run/media/login/Kindle
+    library_root: /home/login/ebooks
+    scrape_root: /home/login/documents
 
 *kindle_root* and *library_root* are mandatory. The rest is optional.
 
-Imported ebooks are kept in a Python dictionary saved and loaded with the marshal module, in library.db.
-Until proven otherwise, it seems quick enough.
+Imported ebooks are kept in a Python dictionary saved and loaded as a json file.
 
 ### Usage
 
