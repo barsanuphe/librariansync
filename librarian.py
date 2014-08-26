@@ -3,7 +3,6 @@
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
 #TODO: list untagged!
 #TODO: sync filtered
-#TODO: -x: exclude from filter
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib
@@ -522,7 +521,30 @@ class Library(object):
                 filtered.append(eb)
         return filtered
 
-    def search(self, search_list, additive=False):
+    def exclude_ebooks(self, ebooks_list, exclude_term):
+        filtered = []
+        exclude_term = exclude_term.lower()
+        for eb in ebooks_list:
+            if exclude_term.startswith("author:"):
+                if exclude_term.split("author:")[1].strip() not in eb.author.lower():
+                    filtered.append(eb)
+            elif exclude_term.startswith("title:"):
+                if exclude_term.split("title:")[1].strip() not in eb.title.lower():
+                    filtered.append(eb)
+            elif exclude_term.startswith("tag:"):
+                tag_to_search_for = exclude_term.split("tag:")[1].strip()
+                not_found = True
+                for tag in eb.tags:
+                    if tag_to_search_for in tag:
+                        not_found = False
+                        break
+                if not_found:
+                    filtered.append(eb)
+            elif exclude_term.lower() not in eb.author.lower() and exclude_term.lower() not in eb.title.lower() and exclude_term.lower() not in eb.tags:
+                filtered.append(eb)
+        return filtered
+
+    def search(self, search_list, exclude_list, additive=False):
         complete_filtered_list_or = []
         complete_filtered_list_and = []
         out = []
@@ -531,7 +553,7 @@ class Library(object):
             out = self.ebooks
         else:
             for library_filter in search_list:
-                filtered = l.search_ebooks(library_filter)
+                filtered = self.search_ebooks(library_filter)
                 complete_filtered_list_or.extend([el for el in filtered if el not in complete_filtered_list_or])
                 if complete_filtered_list_and == []:
                     complete_filtered_list_and = filtered
@@ -541,6 +563,11 @@ class Library(object):
                 out =  complete_filtered_list_and
             else:
                 out =  complete_filtered_list_or
+
+        if exclude_list is not None:
+            for exclude in exclude_list:
+                out = self.exclude_ebooks(out, exclude)
+
         return sorted(out, key=lambda x: x.filename)
 
     def list_tags(self):
@@ -565,9 +592,10 @@ if __name__ == "__main__":
     group_import_export.add_argument('-s', '--scrape', dest='scrape', action='store_true', default = False, help='scrape for ebooks')
     group_import_export.add_argument('-k', '--sync-kindle', dest='kindle', action='store_true', default = False, help='sync library with kindle')
 
-    group_tagging = parser.add_argument_group('Tagging', 'Search and tag ebooks. Filters can begin with author:, title:, tag: for a more precise search.')
+    group_tagging = parser.add_argument_group('Tagging', 'Search and tag ebooks. For --list, --filter and --exclude, STRING can begin with author:, title:, tag: for a more precise search.')
     group_tagging.add_argument('-f', '--filter', dest='filter_ebooks_and', action='store', nargs="*", metavar="STRING", help='list ebooks in library matching ALL patterns')
     group_tagging.add_argument('-l', '--list', dest='filter_ebooks_or', action='store', nargs="*", metavar="STRING", help='list ebooks in library matching ANY pattern')
+    group_tagging.add_argument('-x', '--exclude', dest='filter_exclude', action='store', nargs="+", metavar="STRING", help='exclude ALL STRINGS from current list/filter')
     group_tagging.add_argument('-t', '--add-tag', dest='add_tag', action='store', nargs="+", help='tag listed ebooks in library')
     group_tagging.add_argument('-d', '--delete-tag', dest='delete_tag', action='store', nargs="+", help='remove tag(s) from listed ebooks in library')
     group_tagging.add_argument('-c', '--collections', dest='collections', action='store_true', help='list all tags')
@@ -578,8 +606,12 @@ if __name__ == "__main__":
         print("No option selected. Try -h.")
         sys.exit()
 
+    if args.filter_exclude is not None and args.filter_ebooks_and is None and args.filter_ebooks_or is None:
+        print("The exclude flag --exclude can only be used with either --list or --filter.")
+        sys.exit()
+
     if (args.add_tag is not None or args.delete_tag is not None) and (args.filter_ebooks_and is None or args.filter_ebooks_and == []) and (args.filter_ebooks_or is None or args.filter_ebooks_or == []) :
-        print("Tagging all ebooks, or removing a tag from all ebooks, arguably makes no sense. Use the --list_and/--list_or options to filter among the library.")
+        print("Tagging all ebooks, or removing a tag from all ebooks, arguably makes no sense. Use the --list/--filter options to filter among the library.")
         sys.exit()
 
     try:
@@ -611,9 +643,9 @@ if __name__ == "__main__":
         # filtering
         filtered = []
         if args.filter_ebooks_and is not None:
-            filtered = l.search(args.filter_ebooks_and, additive = True)
+            filtered = l.search(args.filter_ebooks_and, args.filter_exclude, additive = True)
         elif args.filter_ebooks_or is not None:
-            filtered = l.search(args.filter_ebooks_or, additive = False)
+            filtered = l.search(args.filter_ebooks_or, args.filter_exclude, additive = False)
 
         # add/remove tags
         if args.add_tag is not None and filtered != []:

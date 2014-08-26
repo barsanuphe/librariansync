@@ -62,7 +62,8 @@ Note: if python2 is the default version on your Linux distribution, launch with 
 
     $ python librarian.py -h
     usage: librarian.py [-h] [-i] [-r] [-s] [-k] [-f [STRING [STRING ...]]]
-                        [-l [STRING [STRING ...]]] [-t ADD_TAG [ADD_TAG ...]]
+                        [-l [STRING [STRING ...]]] [-x STRING [STRING ...]]
+                        [-t ADD_TAG [ADD_TAG ...]]
                         [-d DELETE_TAG [DELETE_TAG ...]] [-c]
 
     Librarian.
@@ -86,11 +87,14 @@ Note: if python2 is the default version on your Linux distribution, launch with 
                             list ebooks in library matching ALL patterns
     -l [STRING [STRING ...]], --list [STRING [STRING ...]]
                             list ebooks in library matching ANY pattern
+    -x STRING [STRING ...], --exclude STRING [STRING ...]
+                            exclude ALL STRINGS from current list/filter
     -t ADD_TAG [ADD_TAG ...], --add-tag ADD_TAG [ADD_TAG ...]
                             tag listed ebooks in library
     -d DELETE_TAG [DELETE_TAG ...], --delete-tag DELETE_TAG [DELETE_TAG ...]
                             remove tag(s) from listed ebooks in library
     -c, --collections     list all tags
+
 
 While syncing with Kindle, *librarian.py* will keep track of previous conversions to the mobi format (for epub ebooks),
 and of previously synced ebooks on the Kindle, and will try to work no more than necessary.
