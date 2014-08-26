@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
-#TODO: list untagged!
-#TODO: sync filtered
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib
@@ -27,8 +25,9 @@ except Exception as err:
     sys.exit(-1)
 
 # library & config are located next to this script
-LIBRARY_DB = os.path.join(os.path.dirname(os.path.realpath(__file__)), "library.json")
-LIBRARY_CONFIG = os.path.join(os.path.dirname(os.path.realpath(__file__)), "librarian.yaml")
+librarian_dir = os.path.dirname(os.path.realpath(__file__))
+LIBRARY_DB = os.path.join(librarian_dir, "library.json")
+LIBRARY_CONFIG = os.path.join(librarian_dir, "librarian.yaml")
 
 BACKUP_IMPORTED_EBOOKS = True
 SCRAPE_ROOT = None
@@ -156,12 +155,12 @@ class Ebook(object):
         self.was_converted_to_mobi = True
 
     def add_to_collection(self, tag):
-        if tag.lower() not in self.tags:
-            self.tags.append(tag.lower())
+        if tag.strip() != "" and tag.strip().lower() not in self.tags:
+            self.tags.append(tag.strip().lower())
 
     def remove_from_collection(self, tag):
-        if tag.lower() in self.tags:
-            self.tags.remove(tag.lower())
+        if tag.strip() != "" and tag.strip().lower() in self.tags:
+            self.tags.remove(tag.strip().lower())
 
     def sync_with_kindle(self):
         if not os.path.exists(KINDLE_ROOT):
@@ -231,12 +230,6 @@ class Library(object):
         self.ebooks = []
         self.open_config()
 
-    def _load_ebook(self, everything, filename):
-        if not "path" in list(everything[filename].keys()):
-            return False, None
-        eb = Ebook(everything[filename]["path"])
-        return eb.try_to_load_from_json(everything, filename), eb
-
     def open_config(self):
         #configuration
         if os.path.exists(LIBRARY_CONFIG):
@@ -265,6 +258,13 @@ class Library(object):
 
     def save_config(self):
         yaml.dump(self.config, open(LIBRARY_CONFIG, 'w'), indent=4, default_flow_style=False, allow_unicode=True)
+
+
+    def _load_ebook(self, everything, filename):
+        if not "path" in list(everything[filename].keys()):
+            return False, None
+        eb = Ebook(everything[filename]["path"])
+        return eb.try_to_load_from_json(everything, filename), eb
 
     def open_db(self):
         self.db = []
@@ -322,10 +322,10 @@ class Library(object):
         if WANTED != {}:
             for ebook in self.ebooks:
                 if ebook.author in list(WANTED.keys()) and WANTED[ebook.author] in ebook.title:
-                    print("Found WANTED ebook: %s - %s "%(ebook.author,WANTED[ebook.author]) )
-                    answer = input("Confirm this is what you were looking for: %s\ny/n? "%ebook)
+                    print("! Found WANTED ebook: %s - %s "%(ebook.author,WANTED[ebook.author]) )
+                    answer = input("! Confirm this is what you were looking for: %s\ny/n? "%ebook)
                     if answer.lower() == "y":
-                        print("Removing from wanted list.")
+                        print(" -> Removing from wanted list.")
                         del WANTED[ebook.author]
                         self.save_config()
 
@@ -338,24 +338,9 @@ class Library(object):
         # adding ebooks in alphabetical order
         for ebook in sorted(self.ebooks, key=lambda x: x.filename):
             data[ebook.filename] = ebook.to_dict()
-
+        # dumping in json file
         with open(LIBRARY_DB, "w") as data_file:
             data_file.write(json.dumps( data, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
-
-    def update_kindle_collections(self, outfile):
-        # generates the json file that is used
-        # by the kual script in librariansync/
-        #print("Building kindle collections from tags.")
-        tags_json = "{\n"
-        for eb in sorted(self.ebooks, key=lambda x: x.filename):
-            if eb.tags != [""]:
-                tags_json += eb.to_json()
-        tags_json = tags_json[:-2] # remove last ","
-        tags_json += "\n}\n"
-
-        f = codecs.open(outfile, "w", "utf8")
-        f.write(tags_json)
-        f.close()
 
     def scrape_dir_for_ebooks(self):
         if SCRAPE_ROOT is None:
@@ -447,10 +432,20 @@ class Library(object):
         else:
             return False
 
-    def rename_from_metadata(self):
-        print("Renaming ebooks from metadata, if necessary.")
-        for eb in l.ebooks:
-            eb.rename_from_metadata()
+    def update_kindle_collections(self, outfile):
+        # generates the json file that is used
+        # by the kual script in librariansync/
+        #print("Building kindle collections from tags.")
+        tags_json = "{\n"
+        for eb in sorted(self.ebooks, key=lambda x: x.filename):
+            if eb.tags != [""]:
+                tags_json += eb.to_json()
+        tags_json = tags_json[:-2] # remove last ","
+        tags_json += "\n}\n"
+
+        f = codecs.open(outfile, "w", "utf8")
+        f.write(tags_json)
+        f.close()
 
     def sync_with_kindle(self):
         print("Syncing with kindle.")
@@ -497,7 +492,7 @@ class Library(object):
                 found_incomplete = True
                 incomplete_list += " -> %s\n"%eb.path
         if found_incomplete:
-            print("Checking for incomplete metadata.")
+            print("The following ebooks have incomplete metadata:")
             print(incomplete_list)
         return found_incomplete
 
@@ -602,14 +597,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # a few checks on the arguments
     if not len(sys.argv) > 1:
         print("No option selected. Try -h.")
         sys.exit()
-
     if args.filter_exclude is not None and args.filter_ebooks_and is None and args.filter_ebooks_or is None:
         print("The exclude flag --exclude can only be used with either --list or --filter.")
         sys.exit()
-
     if (args.add_tag is not None or args.delete_tag is not None) and (args.filter_ebooks_and is None or args.filter_ebooks_and == []) and (args.filter_ebooks_or is None or args.filter_ebooks_or == []) :
         print("Tagging all ebooks, or removing a tag from all ebooks, arguably makes no sense. Use the --list/--filter options to filter among the library.")
         sys.exit()
@@ -649,24 +643,21 @@ if __name__ == "__main__":
 
         # add/remove tags
         if args.add_tag is not None and filtered != []:
-            tags = [el.lower() for el in args.add_tag] # sanitize
             for ebook in filtered:
-                for tag in tags:
-                    if tag not in ebook.tags:
-                        ebook.tags.append(tag)
+                for tag in args.add_tag:
+                    ebook.add_to_collection(tag)
         if args.delete_tag is not None and filtered != []:
-            tags = [el.lower() for el in args.delete_tag] # sanitize
             for ebook in filtered:
-                for tag in tags:
-                    if tag in ebook.tags:
-                        ebook.tags.remove(tag)
+                for tag in args.delete_tag:
+                    ebook.remove_from_collection(tag)
 
         for ebook in filtered:
             print(" -> ", ebook)
 
+        l.save_db()
+        
     except Exception as err:
         print(err)
         sys.exit(-1)
 
-    l.save_db()
     print("Everything done in %.2fs."%(time.perf_counter() - start))

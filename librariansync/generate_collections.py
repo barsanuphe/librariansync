@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 import subprocess, json, os, uuid, time, sys, shutil
 
-DB = "cc.db" # kindle db name
-KINDLE_DB_PATH = "/var/local/%s"%DB # kindle db path
+KINDLE_DB_PATH = "/var/local/cc.db"
 TAGS = "../collections.json"
-CC_DUMP = "dump.sql"
 KINDLE_EBOOKS_ROOT = "/mnt/us/documents"
 
 ID = 0 # global transaction id

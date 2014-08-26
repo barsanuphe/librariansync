@@ -80,7 +80,7 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     -k, --sync-kindle     sync library with kindle
 
     Tagging:
-    Search and tag ebooks. Filters can begin with author:, title:, tag: for a
+    Search and tag ebooks. For --list, --filter and --exclude, STRING can begin with author:, title:, tag: for a
     more precise search.
 
     -f [STRING [STRING ...]], --filter [STRING [STRING ...]]
