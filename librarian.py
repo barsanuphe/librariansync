@@ -3,7 +3,8 @@
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
-import os, subprocess, shutil, sys, hashlib
+import os, subprocess, shutil, sys, hashlib, zipfile
+import xml.dom.minidom
 import time, concurrent.futures, multiprocessing, json, argparse
 
 import sys
@@ -12,8 +13,7 @@ if sys.version_info<(3,0,0):
   exit(-1)
 
 try:
-    assert subprocess.call("ebook-meta --version", shell=True, stdout=subprocess.DEVNULL) == 0
-    assert subprocess.call("ebook-convert --version", shell=True, stdout=subprocess.DEVNULL) == 0
+    assert subprocess.call(["ebook-convert","--version"], stdout=subprocess.DEVNULL) == 0
 except AssertionError as err:
     print("Calibre must be installed!")
     sys.exit(-1)
@@ -77,39 +77,73 @@ class Ebook(object):
 
     @property
     def filename(self):
-        return "%s/%s (%s) %s.%s"%(self.author, self.author, self.date, self.title, self.format.lower())
+        return "%s/%s (%s) %s.%s"%(self.author, self.author, self.date, self.title, self.format)
 
     @property
     def exported_filename(self):
         return os.path.splitext(self.filename)[0] + ".mobi"
 
+    def get_epub_metadata(self):
+        # prepare to read from the .epub file
+        zip = zipfile.ZipFile(self.path)
+
+        # find the contents metafile
+        txt = zip.read('META-INF/container.xml')
+        tree = xml.dom.minidom.parseString(txt)
+        rootfile = tree.getElementsByTagName("rootfile")[0]
+        filename = rootfile.getAttribute("full-path")
+
+        # grab the metadata block from the contents metafile
+        cf = zip.read(filename)
+        tree = xml.dom.minidom.parseString(cf)
+        try:
+            md = tree.getElementsByTagName("metadata")[0]
+        except:
+            md = tree.getElementsByTagName("opf:metadata")[0]
+        res = {}
+        for child in md.childNodes:
+            if child.hasChildNodes() and child.firstChild.nodeType == xml.dom.Node.TEXT_NODE:
+                if child.nodeName in list(res.keys()):
+                    res[child.nodeName].append(child.firstChild.data)
+                else:
+                    res[child.nodeName] = [child.firstChild.data]
+        return res
+
+    def sanitize_epub_metadata(self, md_dict):
+        res = {}
+        try:
+            if len(md_dict["dc:creator"]) >= 2:
+                res["author"] = "Various"
+            else:
+                res["author"] = md_dict["dc:creator"][0]
+                if ',' in res["author"]:
+                    parts = res["author"].split(",")
+                    if len(parts) == 2:
+                        res["author"] = "%s %s"%(parts[1].strip(), parts[0].strip())
+                    if len(parts) > 2:
+                        res["author"] = "Various"
+            res["author"] = res["author"].title()
+            res["title"] = md_dict["dc:title"][0].replace(":", "").replace("?","").replace("/", "-").title()
+            res["year"] = int(md_dict["dc:date"][0][:4])
+            res["lang"] = md_dict["dc:language"][0]
+        except Exception as err:
+            print("!!!!! ", err, "!!!! \n")
+            return None
+        return res
+
     def read_metadata(self):
         try:
-            all_metadata = subprocess.check_output('ebook-meta "%s"'%self.path, shell=True)
-            all_metadata = all_metadata.split(b"\n")
-            md_dict = {}
-            for md in all_metadata:
-                parts = md.split(b":")
-                md_dict[ parts[0].decode().strip() ] = b":".join(parts[1:]).decode().strip()
+            all_metadata = self.get_epub_metadata()
+            md_dict = self.sanitize_epub_metadata(all_metadata)
         except:
             print("Impossible to read metadata for ", self.path)
             return False
-
         try:
-            self.author = md_dict["Author(s)"].split('[')[0].strip().title()
-            if ',' in self.author:
-                parts = self.author.split(",")
-                if len(parts) == 2:
-                    self.author = "%s %s"%(parts[1].strip(), parts[0].strip())
-                if len(parts) > 2:
-                    self.author = "Various"
-            if '&' in self.author:
-                self.author = "Various"
+            self.author = md_dict["author"]
             if self.author in list(AUTHOR_ALIASES.keys()):
                 self.author = AUTHOR_ALIASES[self.author]
-
-            self.title = md_dict["Title"].replace(":", "").replace("?","").replace("/", "-").title()
-            self.date = int(md_dict["Published"][:4])
+            self.title = md_dict["title"]
+            self.date = int(md_dict["year"])
             self.is_metadata_complete = True
             self.rename_from_metadata()
 
@@ -143,12 +177,9 @@ class Ebook(object):
             print("Creating directory", os.path.dirname(output_filename) )
             os.makedirs( os.path.dirname(output_filename) )
 
-        if self.format == "mobi":
-            shutil.copy( self.path, output_filename)
-        else:
-            #conversion
-            print("   + Converting to .mobi: ", self.filename)
-            subprocess.call(['ebook-convert "%s" "%s" --output-profile kindle_pw'%(self.path, output_filename)], shell=True, stdout=subprocess.DEVNULL)
+        #conversion
+        print("   + Converting to .mobi: ", self.filename)
+        subprocess.call(['ebook-convert', self.path, output_filename, "--output-profile", "kindle_pw"], stdout=subprocess.DEVNULL)
 
         self.converted_to_mobi_hash = hashlib.sha1(open(output_filename, 'rb').read()).hexdigest()
         self.converted_to_mobi_from_hash = self.current_hash
@@ -198,7 +229,7 @@ class Ebook(object):
         return  {
                     "author": self.author, "title": self.title,
                     "path": self.path,  "tags": ",".join([el for el in self.tags if el.strip() != ""]),
-                    "format": self.format, "date": self.date,
+                    "date": self.date,
                     "last_synced_hash": self.last_synced_hash, "converted_to_mobi_hash": self.converted_to_mobi_hash, "converted_to_mobi_from_hash": self.converted_to_mobi_from_hash
                 }
 
@@ -209,12 +240,11 @@ class Ebook(object):
 
     def try_to_load_from_json(self, everything, filename):
         if not os.path.exists(everything[filename]["path"]):
-            print("File %s in DB cannot be found, ignoring."%path)
+            print("File %s in DB cannot be found, ignoring."%everything[filename]["path"])
             return False
         try:
             self.author = everything[filename]['author']
             self.title = everything[filename]['title']
-            self.format = everything[filename]['format']
             self.tags = [el.lower().strip() for el in everything[filename]['tags'].split(",") if el.strip() != ""]
             self.date = everything[filename]['date']
             self.converted_to_mobi_hash = everything[filename]['converted_to_mobi_hash']
@@ -304,7 +334,7 @@ class Library(object):
 
         all_ebooks_in_library_dir = []
         for root, dirs, files in os.walk(LIBRARY_DIR):
-            all_ebooks_in_library_dir.extend([os.path.join(root, el) for el in files if el.lower().endswith(".epub") or el.lower().endswith(".mobi")])
+            all_ebooks_in_library_dir.extend([os.path.join(root, el) for el in files if el.lower().endswith(".epub")])
 
         cpt = 1
         with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
@@ -376,15 +406,34 @@ class Library(object):
         print("Scraped ebooks in %.2fs."%(time.perf_counter() - start))
         return True
 
+    def _convert_to_epub_before_importing(self, mobi):
+        if not os.path.exists(mobi.replace(".mobi",".epub")):
+            print("   + Converting to .epub: ", mobi)
+            return subprocess.call(['ebook-convert', mobi, mobi.replace(".mobi", ".epub"), "--output-profile", "kindle_pw"], stdout=subprocess.DEVNULL)
+        else:
+            return 0
+
     def import_new_ebooks(self):
-        all_ebooks = [el for el in os.listdir(IMPORT_DIR) if el.endswith(".epub") or el.endswith(".mobi")]
+        # multithreaded conversion to epub before import, if necessary
+        cpt = 1
+        all_mobis = [os.path.join(IMPORT_DIR, el) for el in os.listdir(IMPORT_DIR) if el.endswith(".mobi")]
+        with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
+            future_epubs = { executor.submit(self._convert_to_epub_before_importing, mobi): mobi for mobi in all_mobis}
+            for future in concurrent.futures.as_completed(future_epubs):
+                if future.result() == 0:
+                    print(" %.2f%%"%( 100*cpt/len(all_mobis)), end="\r", flush=True)
+                    cpt += 1
+                else:
+                    raise Exception("Error converting to epub!")
+
+        all_ebooks = [el for el in os.listdir(IMPORT_DIR) if el.endswith(".epub")]
         if len(all_ebooks) == 0:
            print("Nothing new to import.")
            return False
         else:
            print("Importing.")
 
-        all_already_imported_ebooks = [el for el in os.listdir(IMPORTED_DIR) if el.endswith(".epub") or el.endswith(".mobi")]
+        all_already_imported_ebooks = [el for el in os.listdir(IMPORTED_DIR) if el.endswith(".epub")]
         already_imported_hashes = []
         for eb in all_already_imported_ebooks:
            already_imported_hashes.append( hashlib.sha1(open(os.path.join(IMPORTED_DIR, eb), 'rb').read()).hexdigest() )
@@ -421,6 +470,9 @@ class Library(object):
             print(" ->",  ebook )
             # backup
             if BACKUP_IMPORTED_EBOOKS:
+                # backup original mobi version if it exists
+                if os.path.exists(ebook_candidate_full_path.replace(".epub", ".mobi")):
+                    shutil.move( ebook_candidate_full_path.replace(".epub", ".mobi"), os.path.join(IMPORTED_DIR, ebook.replace(".epub", ".mobi") ) )
                 shutil.copyfile( ebook_candidate_full_path, os.path.join(IMPORTED_DIR, ebook ) )
             # import
             shutil.move( ebook_candidate_full_path, os.path.join(LIBRARY_DIR, ebook))
@@ -655,7 +707,7 @@ if __name__ == "__main__":
             print(" -> ", ebook)
 
         l.save_db()
-        
+
     except Exception as err:
         print(err)
         sys.exit(-1)

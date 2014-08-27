@@ -2,9 +2,9 @@ librarian
 =========
 
 Ebook manager that can sync to a Kindle Paperwhite and automatically create collections from tags.
-Only epub and mobi ebooks are considered, with a preference for epub.
 
-There is no guarantee that this will be useful to anyone but myself.
+
+*There is no guarantee that this will be useful to anyone but myself.*
 
 what it does
 ------------
@@ -18,14 +18,13 @@ This is made of two parts:
 - *Librarian Sync*:
     runs on the Kindle, and can automatically build the collections based on the tags added with librarian.py.
 
-
 librarian
 ---------
 
 ### Requirements
 
 - Python 3
-- Calibre (librarian.py relies on ebook-meta and ebook-convert, which are part of Calibre)
+- Calibre (librarian.py relies on ebook-convert, which are part of Calibre)
 - pyyaml for python 3
 
 ### Configuration
@@ -51,10 +50,16 @@ An example configuration would be:
     kindle_root: /run/media/login/Kindle
     library_root: /home/login/ebooks
     scrape_root: /home/login/documents
+    wanted:
+        Harry Harrisson: Make Room! Make Room!
 
 *kindle_root* and *library_root* are mandatory. The rest is optional.
+The *wanted* option is to be seen as a way to keep a wishlist. Librarian.py will remove the entries it finds on import.
 
-Imported ebooks are kept in a Python dictionary saved and loaded as a json file.
+**Note**: Only epub ebooks can be added to the library. They are converted to mobi while syncing with the Kindle.
+If mobi ebooks are present in the *import* folder, they are converted to epub, then imported. Both the original mobi and the resulting epub are then backed up in the *imported* folder.
+
+The library database is kept in a Python dictionary saved and loaded as a json file.
 
 ### Usage
 
