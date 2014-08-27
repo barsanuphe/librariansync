@@ -65,11 +65,11 @@ The library database is kept in a Python dictionary saved and loaded as a json f
 
 Note: if python2 is the default version on your Linux distribution, launch with *python3 librarian.py*.
 
-    $ python librarian.py -h
+    python librarian.py -h
     usage: librarian.py [-h] [-i] [-r] [-s] [-k] [-f [STRING [STRING ...]]]
                         [-l [STRING [STRING ...]]] [-x STRING [STRING ...]]
                         [-t ADD_TAG [ADD_TAG ...]]
-                        [-d DELETE_TAG [DELETE_TAG ...]] [-c]
+                        [-d DELETE_TAG [DELETE_TAG ...]] [-c [COLLECTIONS]]
 
     Librarian.
 
@@ -85,8 +85,8 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     -k, --sync-kindle     sync library with kindle
 
     Tagging:
-    Search and tag ebooks. For --list, --filter and --exclude, STRING can begin with author:, title:, tag: for a
-    more precise search.
+    Search and tag ebooks. For --list, --filter and --exclude, STRING can
+    begin with author:, title:, tag: for a more precise search.
 
     -f [STRING [STRING ...]], --filter [STRING [STRING ...]]
                             list ebooks in library matching ALL patterns
@@ -98,7 +98,8 @@ Note: if python2 is the default version on your Linux distribution, launch with 
                             tag listed ebooks in library
     -d DELETE_TAG [DELETE_TAG ...], --delete-tag DELETE_TAG [DELETE_TAG ...]
                             remove tag(s) from listed ebooks in library
-    -c, --collections     list all tags
+    -c [COLLECTIONS], --collections [COLLECTIONS]
+                            list all tags or ebooks with a given tag
 
 
 While syncing with Kindle, *librarian.py* will keep track of previous conversions to the mobi format (for epub ebooks),

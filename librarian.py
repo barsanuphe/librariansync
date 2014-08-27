@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
+#TODO: interactive import: y/n?
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
@@ -223,7 +224,7 @@ class Ebook(object):
         if self.tags == []:
             return "%s (%s) %s"%(self.author, self.date, self.title)
         else:
-            return "%s (%s) %s -- %s"%(self.author, self.date, self.title, ", ".join(self.tags))
+            return "%s (%s) %s [ %s ]"%(self.author, self.date, self.title, ", ".join(self.tags))
 
     def to_dict(self):
         return  {
@@ -548,25 +549,29 @@ class Library(object):
             print(incomplete_list)
         return found_incomplete
 
-    def search_ebooks(self, search_string):
+    def search_ebooks(self, search_string, exact_search = False):
         filtered = []
         search_string = search_string.lower()
         for eb in self.ebooks:
             if search_string.startswith("author:"):
-                if search_string.split("author:")[1].strip() in eb.author.lower():
+                if (not exact_search and search_string.split("author:")[1].strip() in eb.author.lower()) \
+                    or (exact_search and search_string.split("author:")[1].strip() == eb.author.lower()):
                     filtered.append(eb)
             elif search_string.startswith("title:"):
-                if search_string.split("title:")[1].strip() in eb.title.lower():
+                if (not exact_search and search_string.split("title:")[1].strip() in eb.title.lower()) \
+                    or (exact_search and search_string.split("title:")[1].strip() == eb.title.lower()):
                     filtered.append(eb)
             elif search_string.startswith("tag:"):
                 tag_to_search_for = search_string.split("tag:")[1].strip()
                 for tag in eb.tags:
-                    if tag_to_search_for in tag:
+                    if (not exact_search and tag_to_search_for in tag) \
+                        or (exact_search and tag_to_search_for == tag):
                         filtered.append(eb)
                         break # at least one match is good enough
-            elif search_string.lower() in eb.author.lower() or search_string.lower() in eb.title.lower() or search_string.lower() in eb.tags:
+            elif (not exact_search and (search_string.lower() in eb.author.lower() or search_string.lower() in eb.title.lower() or search_string.lower() in eb.tags)) \
+                or (exact_search and (search_string.lower() == eb.author.lower() or search_string.lower() == eb.title.lower() or search_string.lower() in eb.tags)):
                 filtered.append(eb)
-        return filtered
+        return sorted(filtered, key=lambda x: x.filename)
 
     def exclude_ebooks(self, ebooks_list, exclude_term):
         filtered = []
@@ -589,7 +594,7 @@ class Library(object):
                     filtered.append(eb)
             elif exclude_term.lower() not in eb.author.lower() and exclude_term.lower() not in eb.title.lower() and exclude_term.lower() not in eb.tags:
                 filtered.append(eb)
-        return filtered
+        return sorted(filtered, key=lambda x: x.filename)
 
     def search(self, search_list, exclude_list, additive=False):
         complete_filtered_list_or = []
@@ -645,7 +650,7 @@ if __name__ == "__main__":
     group_tagging.add_argument('-x', '--exclude', dest='filter_exclude', action='store', nargs="+", metavar="STRING", help='exclude ALL STRINGS from current list/filter')
     group_tagging.add_argument('-t', '--add-tag', dest='add_tag', action='store', nargs="+", help='tag listed ebooks in library')
     group_tagging.add_argument('-d', '--delete-tag', dest='delete_tag', action='store', nargs="+", help='remove tag(s) from listed ebooks in library')
-    group_tagging.add_argument('-c', '--collections', dest='collections', action='store_true', help='list all tags')
+    group_tagging.add_argument('-c', '--collections', dest='collections', action='store', const="", nargs='?', help='list all tags or ebooks with a given tag')
 
     args = parser.parse_args()
 
@@ -681,13 +686,16 @@ if __name__ == "__main__":
         if args.kindle:
             l.sync_with_kindle()
 
-        if args.collections:
-            all_tags = l.list_tags()
-            for tag in sorted(list(all_tags.keys())):
-                print(" -> %s (%s)"%(tag, all_tags[tag]))
-
         # filtering
         filtered = []
+        if args.collections is not None:
+            if args.collections == "":
+                all_tags = l.list_tags()
+                for tag in sorted(list(all_tags.keys())):
+                    print(" -> %s (%s)"%(tag, all_tags[tag]))
+            else:
+                filtered = l.search_ebooks('tag:%s'%args.collections, exact_search = True)
+
         if args.filter_ebooks_and is not None:
             filtered = l.search(args.filter_ebooks_and, args.filter_exclude, additive = True)
         elif args.filter_ebooks_or is not None:
