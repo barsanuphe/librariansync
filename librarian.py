@@ -1,7 +1,7 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
-#TODO: interactive import: y/n?
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
@@ -30,11 +30,9 @@ librarian_dir = os.path.dirname(os.path.realpath(__file__))
 LIBRARY_DB = os.path.join(librarian_dir, "library.json")
 LIBRARY_CONFIG = os.path.join(librarian_dir, "librarian.yaml")
 
-BACKUP_IMPORTED_EBOOKS = True
-SCRAPE_ROOT = None
+
 KINDLE_DOCUMENTS_SUBDIR = "library"
 AUTHOR_ALIASES = {}
-WANTED = {}
 
 def refresh_global_variables():
     global IMPORT_DIR, IMPORTED_DIR, LIBRARY_DIR, KINDLE_DIR, COLLECTIONS, LIBRARY_ROOT
@@ -259,13 +257,17 @@ class Ebook(object):
 class Library(object):
     def __init__(self):
         self.ebooks = []
+        self.backup_imported_ebooks = True
+        self.scrape_root = None
+        self.wanted = {}
+        self.interactive = False
         self.open_config()
 
     def open_config(self):
         #configuration
         if os.path.exists(LIBRARY_CONFIG):
             self.config = yaml.load(open(LIBRARY_CONFIG, 'r'))
-            global KINDLE_ROOT, LIBRARY_ROOT, BACKUP_IMPORTED_EBOOKS, SCRAPE_ROOT, AUTHOR_ALIASES, KINDLE_DOCUMENTS_SUBDIR, WANTED
+            global KINDLE_ROOT, LIBRARY_ROOT, AUTHOR_ALIASES, KINDLE_DOCUMENTS_SUBDIR
             try:
                 KINDLE_ROOT = self.config["kindle_root"]
                 LIBRARY_ROOT = self.config["library_root"]
@@ -279,13 +281,15 @@ class Library(object):
                 raise Exception("Invalid configuration file!")
 
             if "scrape_root" in list(self.config.keys()):
-                SCRAPE_ROOT = self.config["scrape_root"]
+                self.scrape_root = self.config["scrape_root"]
             if "backup_imported_ebooks" in list(self.config.keys()):
-                BACKUP_IMPORTED_EBOOKS = self.config["backup_imported_ebooks"]
+                self.backup_imported_ebooks = self.config["backup_imported_ebooks"]
             if "author_aliases" in list(self.config.keys()):
                 AUTHOR_ALIASES = self.config["author_aliases"]
             if "wanted" in list(self.config.keys()):
-                WANTED = self.config["wanted"]
+                self.wanted = self.config["wanted"]
+            if "interactive" in list(self.config.keys()):
+                self.interactive = self.config["interactive"]
 
     def save_config(self):
         yaml.dump(self.config, open(LIBRARY_CONFIG, 'w'), indent=4, default_flow_style=False, allow_unicode=True)
@@ -350,14 +354,14 @@ class Library(object):
         for eb in to_delete:
            print(" -> DELETED EBOOK: ", eb)
 
-        if WANTED != {}:
+        if self.wanted != {}:
             for ebook in self.ebooks:
-                if ebook.author in list(WANTED.keys()) and WANTED[ebook.author] in ebook.title:
-                    print("! Found WANTED ebook: %s - %s "%(ebook.author,WANTED[ebook.author]) )
+                if ebook.author in list(self.wanted.keys()) and self.wanted[ebook.author] in ebook.title:
+                    print("! Found WANTED ebook: %s - %s "%(ebook.author,self.wanted[ebook.author]) )
                     answer = input("! Confirm this is what you were looking for: %s\ny/n? "%ebook)
                     if answer.lower() == "y":
                         print(" -> Removing from wanted list.")
-                        del WANTED[ebook.author]
+                        del self.wanted[ebook.author]
                         self.save_config()
 
         is_incomplete = self.list_incomplete_metadata()
@@ -374,14 +378,14 @@ class Library(object):
             data_file.write(json.dumps( data, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
 
     def scrape_dir_for_ebooks(self):
-        if SCRAPE_ROOT is None:
+        if self.scrape_root is None:
             print("scrape_root not defined in librarian.yaml, nothing to do.")
             return
 
         start = time.perf_counter()
         all_ebooks_in_scrape_dir = []
-        print("Finding ebooks in %s..."%SCRAPE_ROOT)
-        for root, dirs, files in os.walk(SCRAPE_ROOT):
+        print("Finding ebooks in %s..."%self.scrape_root)
+        for root, dirs, files in os.walk(self.scrape_root):
             all_ebooks_in_scrape_dir.extend([os.path.join(root, el) for el in files if el.lower().endswith(".epub") or el.lower().endswith(".mobi")])
 
         # if an ebook has an epub and mobi version, only take epub
@@ -398,7 +402,7 @@ class Library(object):
            print("Nothing to scrape.")
            return False
         else:
-           print("Scraping ", SCRAPE_ROOT)
+           print("Scraping ", self.scrape_root)
 
         for ebook in filtered_ebooks_in_scrape_dir:
             print(" -> Scraping ", os.path.basename(ebook))
@@ -467,10 +471,17 @@ class Library(object):
                 print(" -> library already contains an entry for: ", temp_ebook.author, " - ", temp_ebook.title, ": ",  ebook )
                 continue
 
+            if self.interactive:
+                print("About to import: %s"%str(temp_ebook) )
+                answer = input("Confirm? \ny/n? ")
+                if answer.lower() == "n":
+                    print(" -> skipping ebook ",  ebook )
+                    continue
+
             # if all checks are ok, importing
             print(" ->",  ebook )
             # backup
-            if BACKUP_IMPORTED_EBOOKS:
+            if self.backup_imported_ebooks:
                 # backup original mobi version if it exists
                 if os.path.exists(ebook_candidate_full_path.replace(".epub", ".mobi")):
                     shutil.move( ebook_candidate_full_path.replace(".epub", ".mobi"), os.path.join(IMPORTED_DIR, ebook.replace(".epub", ".mobi") ) )

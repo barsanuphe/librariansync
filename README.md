@@ -46,6 +46,7 @@ An example configuration would be:
         China Mieville: China Miéville
         Richard Morgan: Richard K. Morgan
     backup_imported_ebooks: true
+    interactive: true
     kindle_documents_subdir: library
     kindle_root: /run/media/login/Kindle
     library_root: /home/login/ebooks
@@ -54,6 +55,7 @@ An example configuration would be:
         Harry Harrisson: Make Room! Make Room!
 
 *kindle_root* and *library_root* are mandatory. The rest is optional.
+*interactive* decides if importing ebooks is automatic or if manual confirmation is required for each book.
 The *wanted* option is to be seen as a way to keep a wishlist. Librarian.py will remove the entries it finds on import.
 
 **Note**: Only epub ebooks can be added to the library. They are converted to mobi while syncing with the Kindle.
