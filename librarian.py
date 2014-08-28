@@ -8,10 +8,9 @@ import os, subprocess, shutil, sys, hashlib, zipfile
 import xml.dom.minidom
 import time, concurrent.futures, multiprocessing, json, argparse
 
-import sys
-if sys.version_info<(3,0,0):
-  sys.stderr.write("You need python 3.0 or later to run this script.\n")
-  exit(-1)
+if sys.version_info < (3,0,0):
+  print("You need python 3.0 or later to run this script.")
+  sys.exit(-1)
 
 try:
     assert subprocess.call(["ebook-convert","--version"], stdout=subprocess.DEVNULL) == 0
@@ -635,12 +634,16 @@ class Library(object):
 
     def list_tags(self):
         all_tags = {}
+        all_tags["untagged"] = 0
         for ebook in self.ebooks:
-            for tag in ebook.tags:
-                if tag in list(all_tags.keys()):
-                    all_tags[tag] += 1
-                else:
-                    all_tags[tag] = 1
+            if ebook.tags == []:
+                all_tags["untagged"] += 1
+            else:
+                for tag in ebook.tags:
+                    if tag in list(all_tags.keys()):
+                        all_tags[tag] += 1
+                    else:
+                        all_tags[tag] = 1
         return all_tags
 
 if __name__ == "__main__":
