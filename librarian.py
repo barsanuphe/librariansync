@@ -661,7 +661,7 @@ if __name__ == "__main__":
     group_tagging.add_argument('-x', '--exclude', dest='filter_exclude', action='store', nargs="+", metavar="STRING", help='exclude ALL STRINGS from current list/filter')
     group_tagging.add_argument('-t', '--add-tag', dest='add_tag', action='store', nargs="+", help='tag listed ebooks in library')
     group_tagging.add_argument('-d', '--delete-tag', dest='delete_tag', action='store', nargs="+", help='remove tag(s) from listed ebooks in library')
-    group_tagging.add_argument('-c', '--collections', dest='collections', action='store', const="", nargs='?', help='list all tags or ebooks with a given tag')
+    group_tagging.add_argument('-c', '--collections', dest='collections', action='store', const="", nargs='?', help='list all tags or ebooks with a given tag or "untagged"')
 
     args = parser.parse_args()
 
@@ -704,6 +704,8 @@ if __name__ == "__main__":
                 all_tags = l.list_tags()
                 for tag in sorted(list(all_tags.keys())):
                     print(" -> %s (%s)"%(tag, all_tags[tag]))
+            elif args.collections == "untagged":
+                filtered = l.search([""], ["tag:"], additive = False)
             else:
                 filtered = l.search_ebooks('tag:%s'%args.collections, exact_search = True)
 

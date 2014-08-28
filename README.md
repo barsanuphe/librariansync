@@ -101,7 +101,7 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     -d DELETE_TAG [DELETE_TAG ...], --delete-tag DELETE_TAG [DELETE_TAG ...]
                             remove tag(s) from listed ebooks in library
     -c [COLLECTIONS], --collections [COLLECTIONS]
-                            list all tags or ebooks with a given tag
+                            list all tags or ebooks with a given tag or "untagged"
 
 
 While syncing with Kindle, *librarian.py* will keep track of previous conversions to the mobi format (for epub ebooks),
