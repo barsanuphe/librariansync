@@ -226,7 +226,7 @@ class Ebook(object):
     def to_dict(self):
         return  {
                     "author": self.author, "title": self.title,
-                    "path": self.path,  "tags": ",".join([el for el in self.tags if el.strip() != ""]),
+                    "path": self.path,  "tags": ",".join(sorted([el for el in self.tags if el.strip() != ""])),
                     "date": self.date,
                     "last_synced_hash": self.last_synced_hash, "converted_to_mobi_hash": self.converted_to_mobi_hash, "converted_to_mobi_from_hash": self.converted_to_mobi_from_hash
                 }

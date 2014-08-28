@@ -121,7 +121,7 @@ It can be used completely independantly of librarian.py, provided the collection
 - [A jailbroken Kindle Paperwhite2](http://www.mobileread.com/forums/showthread.php?t=186645)
 - [Mobiread Kindlet Kit installed](http://www.mobileread.com/forums/showthread.php?t=233932)
 - [KUAL installed](http://www.mobileread.com/forums/showthread.php?t=203326)
-- [Python installed](http://www.mobileread.com/forums/showthread.php?t=195474)
+- [Python installed](http://www.mobileread.com/forums/showthread.php?t=225030) (snapshot > 0.10N-r10867)
 
 For instructions on how to do that, try the [mobileread forum](http://www.mobileread.com/forums/forumdisplay.php?f=150) in general.
 
