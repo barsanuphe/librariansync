@@ -10,8 +10,6 @@ SELECT_COLLECTION_ENTRIES =     'select p_uuid, p_titles_0_nominal          from
 SELECT_EBOOK_ENTRIES =          'select p_uuid, p_location                  from Entries where p_type = "Entry:Item"'
 SELECT_EXISTING_COLLECTIONS =   'select i_collection_uuid, i_member_uuid    from Collections'
 
-ID = 0 # global transaction id
-
 def parse_entries(cursor):
     ebooks = {}
     collections = {}
@@ -42,12 +40,17 @@ def parse_existing_collections():
 def parse_config(config_file):
     return json.load(open(config_file, 'r'), 'utf8')
 
-def update_kinde_db(cursor, db_ebooks, db_collections, config_tags, complete_rebuild = True):
+def send_post_commands(command):
+    full_command = { "commands": command,"type":"ChangeRequest","id": 1}
+    r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
 
+def update_kinde_db(cursor, db_ebooks, db_collections, config_tags, complete_rebuild = True):
+    commands = []
     if complete_rebuild:
         # remove all previous collections
         for coll_uuid in db_collections.values():
-            update_kindle_db( delete_collection_json(coll_uuid) )
+            commands.append( delete_collection_json(coll_uuid) )
+            #update_kindle_db( delete_collection_json(coll_uuid) )
         db_collections = {} # raz
 
         collections_dict = {} # dict [collection uuid] = [ ebook uuids, ]
@@ -80,7 +83,8 @@ def update_kinde_db(cursor, db_ebooks, db_collections, config_tags, complete_reb
                         timestamp = int(time.time())
                         #insert new collection dans Entries
                         #TODO: if not top collection, p_isVisibleInHome = 0
-                        update_kindle_db( insert_new_collection_entry(new_coll_uuid, subcollection, timestamp) )
+                        commands.append( insert_new_collection_entry(new_coll_uuid, subcollection, timestamp) )
+                        #update_kindle_db( insert_new_collection_entry(new_coll_uuid, subcollection, timestamp) )
                         db_collections[subcollection] = new_coll_uuid
 
                     if i == 0: # ebook collection:
@@ -104,7 +108,11 @@ def update_kinde_db(cursor, db_ebooks, db_collections, config_tags, complete_reb
 
     # update all 'Collections' entries with new members
     for coll in collections_dict.keys():
-        update_kindle_db( update_collections_entry(coll, collections_dict[coll]) )
+        commands.append(update_collections_entry(coll, collections_dict[coll]) )
+        #update_kindle_db( update_collections_entry(coll, collections_dict[coll]) )
+
+    # send all the commands to update the database
+    send_post_commands(commands)
 
 def delete_collection_json(coll_uuid):
     return {"delete": {"uuid": coll_uuid }}
@@ -118,17 +126,6 @@ def update_collections_entry(coll_uuid, members):
         members_str += '%s,'%m
     members_str = members_str[:-1]
     return {"update": {"type": "Collection","uuid": str(coll_uuid), "members": [members_str]}}
-
-def update_kindle_db(command):
-    global ID
-    full_command = { "commands": [command],"type":"ChangeRequest","id": ID}
-    ID += 1
-    print full_command
-    r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
-    print r.url
-    print r.json()
-    print r.json()["ok"]
-
 
 def update_cc_db(complete_rebuild = True):
     cc_db = sqlite3.connect(KINDLE_DB_PATH)
