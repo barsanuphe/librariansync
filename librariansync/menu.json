@@ -5,20 +5,27 @@
             "priority": -1,
             "items": [
                 {
-                    "name": "Rebuild all collections",
+                    "name": "Rebuild all collections (from json)",
                     "priority": -1,
                     "exitmenu": false,
                     "status": false,
                     "action": "python generate_collections.py rebuild &> log.txt"
                 },
                 {
-                    "name": "Add to collections",
+                    "name": "Add to collections (from json)",
                     "priority": -1,
                     "exitmenu": false,
                     "status": false,
                     "action": "python generate_collections.py add &> log.txt"
+                },
+                {
+                    "name": "Rebuild all collections (from folders)",
+                    "priority": -1,
+                    "exitmenu": false,
+                    "status": false,
+                    "action": "python generate_collections.py rebuild_from_folders &> log.txt"
                 }
-                ]
+            ]
         }
     ]
 }
