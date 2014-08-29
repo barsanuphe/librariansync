@@ -42,16 +42,14 @@ def parse_config(config_file):
 
 def get_relative_path(path):
     relative_path = path.split(KINDLE_EBOOKS_ROOT)[1].decode("utf8")
-    if relative_path == u"":
-        return u"root"
-    else:
-        return relative_path
+    return relative_path
 
 def list_folder_contents():
     folder_contents = {}
     for root, dirs, files in os.walk(KINDLE_EBOOKS_ROOT):
-        for f in [ get_relative_path(os.path.join(root, el)) for el in files if os.path.splitext(el.lower())[1] in [".epub", ".mobi", ".azw3"]]:
-            folder_contents[f] = [get_relative_path(root)]
+        for f in [ get_relative_path(os.path.join(root, el)) for el in files if os.path.splitext(el.lower())[1] in [".azw", ".azw3", ".mobi", ".prc", ".pdf", ".txt"]]:
+            if get_relative_path(root) != u"":
+                folder_contents[f] = [get_relative_path(root)]
     return folder_contents
 
 def send_post_commands(command):

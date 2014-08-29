@@ -153,9 +153,9 @@ When *rebuilding collections*, Librarian Sync removes all collections, then adds
 
 When *adding to them*, it preserves already existing collections, and only either add entries to them or creates new collections as defined in collections.json.
 
-When *rebuilding collection from folders*, it removes all collections and recursively scans for .epub/.mobi/.azw3 files inside the documents/ folder.
+When *rebuilding collection from folders*, it removes all collections and recursively scans for .mobi/.azw3/.azw/.prc/.txt/.pdf files inside the documents/ folder.
 Subfolders will be treated as different collections.
-Ebooks directly in the documents/ folder will be placed in the *root* collection.
+Ebooks directly in the documents/ folder are ignored.
 
 Allow for a few seconds for the Kindle database and interface to reflect the changes made.
 
