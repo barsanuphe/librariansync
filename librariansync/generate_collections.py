@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import subprocess, json, os, uuid, time, sys, shutil
+import subprocess, json, os, uuid, time, sys, shutil, locale
 import sqlite3, requests
 
 KINDLE_DB_PATH = "/var/local/cc.db"
@@ -128,10 +128,29 @@ def delete_collection_json(coll_uuid):
     return {"delete": {"uuid": coll_uuid }}
 
 def insert_new_collection_entry(coll_uuid, title, timestamp):
-    return { "insert": {"type": "Collection", "uuid": str(coll_uuid), "lastAccess": timestamp, "titles": [{"display": title, "direction": "LTR", "language": "en-US"}], "isVisibleInHome": 1} }
+    locale_lang = locale.getdefaultlocale()[0]
+    return { "insert":
+                {
+                    "type": "Collection",
+                    "uuid": str(coll_uuid),
+                    "lastAccess": timestamp,
+                    "titles": [
+                                {
+                                    "display": title,
+                                    "direction": "LTR",
+                                    "language": locale_lang
+                                }
+                              ],
+                    "isVisibleInHome": 1,
+                    "isArchived": 1,
+                    "collections": None,
+                    "collectionCount": None,
+                    "collectionDataSetName": str(coll_uuid)
+                 }
+             }
 
 def update_collections_entry(coll_uuid, members):
-    return {"update": {"type": "Collection","uuid": str(coll_uuid), "members": members}}
+    return {"update": { "type": "Collection", "uuid": str(coll_uuid), "members": members}}
 
 def update_cc_db(complete_rebuild = True, from_json = True):
     cc_db = sqlite3.connect(KINDLE_DB_PATH)
