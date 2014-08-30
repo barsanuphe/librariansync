@@ -10,6 +10,8 @@ SELECT_COLLECTION_ENTRIES =     'select p_uuid, p_titles_0_nominal          from
 SELECT_EBOOK_ENTRIES =          'select p_uuid, p_location                  from Entries where p_type = "Entry:Item"'
 SELECT_EXISTING_COLLECTIONS =   'select i_collection_uuid, i_member_uuid    from Collections'
 
+ALLOWED_EXTENSIONS = [".azw", ".mobi", ".prc", ".pobi", ".azw3", ".azw6", ".yj", ".azw1", ".tpz", ".pdf", ".txt", ".html", ".htm", ".jpg", ".jpeg"]
+
 def parse_entries(cursor):
     ebooks = {}
     collections = {}
@@ -47,7 +49,7 @@ def get_relative_path(path):
 def list_folder_contents():
     folder_contents = {}
     for root, dirs, files in os.walk(KINDLE_EBOOKS_ROOT):
-        for f in [ get_relative_path(os.path.join(root, el)) for el in files if os.path.splitext(el.lower())[1] in [".azw", ".azw3", ".mobi", ".prc", ".pdf", ".txt"]]:
+        for f in [ get_relative_path(os.path.join(root, el)) for el in files if os.path.splitext(el.lower())[1] in ALLOWED_EXTENSIONS]:
             if get_relative_path(root) != u"":
                 folder_contents[f] = [get_relative_path(root)]
     return folder_contents
@@ -142,7 +144,7 @@ def insert_new_collection_entry(coll_uuid, title, timestamp):
                                 }
                               ],
                     "isVisibleInHome": 1,
-                    "isArchived": 1,
+                    "isArchived": 0,
                     "collections": None,
                     "collectionCount": None,
                     "collectionDataSetName": str(coll_uuid)
