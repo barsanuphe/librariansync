@@ -123,6 +123,18 @@ def update_kinde_db(cursor, db_ebooks, db_collections, config_tags, complete_reb
     for coll in collections_dict.keys():
         commands.append(update_collections_entry(coll, collections_dict[coll]) )
 
+    # update all ebooks in a collection with the number of collections.
+    ebook_dict = {} # { uuid: number_of_collections }
+    for coll in collections_dict.keys():
+        ebook_uuids = collections_dict[coll]
+        for ebook_uuid in ebook_uuids:
+            if ebook_uuid in ebook_dict.keys():
+                ebook_dict[ebook_uuid] += 1
+            else:
+                ebook_dict[ebook_uuid] = 1
+    for ebook in ebook_dict.keys():
+        commands.append( update_ebook_entry_if_in_collection( ebook, ebook_dict[ebook]))
+
     # send all the commands to update the database
     send_post_commands(commands)
 
@@ -153,6 +165,10 @@ def insert_new_collection_entry(coll_uuid, title, timestamp):
 
 def update_collections_entry(coll_uuid, members):
     return {"update": { "type": "Collection", "uuid": str(coll_uuid), "members": members}}
+
+def update_ebook_entry_if_in_collection(ebook_uuid, number_of_collections):
+    return {"update": { "type": "Entry:Item", "uuid": str(ebook_uuid), "collectionCount": number_of_collections}}
+
 
 def update_cc_db(complete_rebuild = True, from_json = True):
     cc_db = sqlite3.connect(KINDLE_DB_PATH)
