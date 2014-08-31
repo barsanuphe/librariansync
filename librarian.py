@@ -4,7 +4,7 @@
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
 #TODO: preview?
 #TODO: support for several series?
-#TODO: exact search series
+#TODO: exact search series?
 #TODO: remove empty dirs when syncing and deleting mobis
 #TODO: dc:subject list?
 
@@ -523,12 +523,16 @@ class Library(object):
         else:
             return False
 
-    def update_kindle_collections(self, outfile):
+    def update_kindle_collections(self, outfile, filtered = []):
         # generates the json file that is used
         # by the kual script in librariansync/
         #print("Building kindle collections from tags.")
+        if filtered == []:
+            ebooks_to_sync = self.ebooks
+        else:
+            ebooks_to_sync = filtered
         tags_json = "{\n"
-        for eb in sorted(self.ebooks, key=lambda x: x.filename):
+        for eb in sorted(ebooks_to_sync, key=lambda x: x.filename):
             if eb.tags != [""]:
                 tags_json += eb.to_json()
         tags_json = tags_json[:-2] # remove last ","
@@ -575,10 +579,9 @@ class Library(object):
             os.remove(mobi)
         #TODO: remove empty dirs
 
-
         # sync collections.json
         print(" -> Generating and copying database for collection generation.")
-        self.update_kindle_collections(COLLECTIONS)
+        self.update_kindle_collections(COLLECTIONS, filtered)
         shutil.copy(COLLECTIONS, KINDLE_EXTENSIONS)
         print("Library synced to kindle in %.2fs."%(time.perf_counter() - start))
 
