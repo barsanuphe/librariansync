@@ -1,7 +1,20 @@
 # Librarian & LibrarianSync
 
-Ebook manager that can sync to a Kindle Paperwhite and automatically create
+Epub Ebook manager that can sync to a Kindle Paperwhite and automatically create
 collections from tags.
+
+## What it is
+
+This is made of two parts:
+
+- [librarian.py](#librarian):
+    which can import epub ebooks, rename them from metadata, convert them to mobi,
+    and sync with a Kindle Paperwhite.
+    It can also perform basic search and add and remove tags.
+
+- [Librarian Sync](#librariansync):
+    runs independantly on the Kindle, and can automatically build the collections
+    based on the tags added with librarian.py or according to the folder structure.
 
 ## Quick disclaimer
 
@@ -16,19 +29,20 @@ Also, this is in very early stages. This means:
 - The LibrarySync part is a little more mature, and has been tested on a european
     wi-fi Kindle pw2. It may work on other models, but this is all I have.
 
+## Table of Contents
 
-## What it is
+- [Librarian](#librarian)
+    - [Requirements](#requirements)
+    - [Configuration](#configuration)
+    - [Usage](#usage)
+    - [Example Commands](#example-commands)
 
-This is made of two parts:
-
-- [librarian.py](#librarian):
-    which can import ebooks, rename them from metadata, convert them to mobi,
-    and sync with a Kindle Paperwhite.
-    It can also perform basic search and add and remove tags.
-
-- [Librarian Sync](#librariansync):
-    runs independantly on the Kindle, and can automatically build the collections
-    based on the tags added with librarian.py or according to the folder structure.
+- [LibrarianSync](#librariansync)
+    - [Requirements](#requirements-1)
+    - [Installation](#installation)
+    - [Usage](#usage-1)
+    - [What it does](#what-it-does)
+    - [collection.json example](#collectionsjson-example)
 
 ## Librarian
 
