@@ -4,9 +4,7 @@
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
 #TODO: preview?
 #TODO: support for several series?
-#TODO: exact search series? + series index
 #TODO: dc:subject list?
-#TODO: inexact tag search
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
