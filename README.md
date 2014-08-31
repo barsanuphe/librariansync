@@ -1,27 +1,37 @@
-librarian
-=========
+# Librarian & LibrarianSync
 
 Ebook manager that can sync to a Kindle Paperwhite and automatically create
 collections from tags.
 
-*There is no guarantee that this will be useful to anyone but myself.*
+## Quick disclaimer
 
-what it does
-------------
+There is no guarantee that this will be useful to anyone but myself.
+
+Also, this is in very early stages. This means:
+
+- Expect the commands and database formats to change any time.
+- Keep backups of your ebooks, both on your computer and your Kindle.
+- This is tested on Archlinux, it should work on other distributions/platforms,
+    but then again it may not because reasons.
+- The LibrarySync part is a little more mature, and has been tested on a european
+    wi-fi Kindle pw2. It may work on other models, but this is all I have.
+
+
+## What it is
 
 This is made of two parts:
 
-- *librarian.py*:
+- [librarian.py](#librarian):
     which can import ebooks, rename them from metadata, convert them to mobi,
     and sync with a Kindle Paperwhite.
     It can also perform basic search and add and remove tags.
 
-- *Librarian Sync*:
-    runs on the Kindle, and can automatically build the collections based on the
-    tags added with librarian.py.
+- [Librarian Sync](#librariansync):
+    runs independantly on the Kindle, and can automatically build the collections
+    based on the tags added with librarian.py or according to the folder structure.
 
-librarian
----------
+## Librarian
+
 
 ### Requirements
 
@@ -117,12 +127,71 @@ While syncing with Kindle, *librarian.py* will keep track of previous conversion
 to the mobi format (for epub ebooks), and of previously synced ebooks on the Kindle,
 and will try to work no more than necessary.
 
+**Syncing** means: copy the mobi versions of all filtered ebooks to the Kindle,
+and *remove from the Kindle all previously existing mobis not presently filtered*.
+Do make sure the *kindle_documents_subdir* of the configuration file only contains
+ebooks that are inside the library.
+
 Note that if books are imported successfully, a refresh is automatically added.
 Also, only .epubs and .mobis are imported/scraped, with a preference for .epub
 when both formats are available.
 
-librarian sync
---------------
+### Example commands
+
+Scrape a directory (specified in the configuration file) and automatically add
+to the library everything that was found:
+
+    python librarian.py -si
+
+Refresh the library after adding "Richard Morgan: Richard K. Morgan" to the
+author aliases in the configuration file, so that all "Richard Morgan" ebooks get
+renamed as "Richard K. Morgan":
+
+    python librarian.py -r
+
+List all tags and the number of ebooks for each:
+
+    python librarian.py -c
+
+List all yet untagged ebooks:
+
+    python librarian.py -c untagged
+
+Display all ebooks in the library with the tag *sf/space opera*:
+
+    python librarian.py -f "tag:sf/space opera"
+
+or
+
+    python librarian.py -c "sf/space opera"
+
+Display all ebooks in the library with the tag *sf/space opera*, but not the Peter
+F. Hamilton books you just read:
+
+    python librarian.py -f "tag:sf/space opera" -x hamilton
+
+Display all ebooks in the library with the tag *sf/space opera*, but not the Peter
+F. Hamilton books you just read, and also everything by Alexandre Dumas:
+
+    python librarian.py -l tag:opera dumas -x hamilton
+
+Tag as *best category* and *random* all ebooks in the library with the tag *sf/space opera*, but not the Peter
+F. Hamilton books you just read, and also everything by Alexandre Dumas:
+
+    python librarian.py -l tag:opera dumas -x hamilton -t "best category" random
+
+Change tag from *best category* to *best category!* for all ebooks in the library with the tag *sf/space opera*, but not the Peter
+F. Hamilton books you just read, and also everything by Alexandre Dumas:
+
+    python librarian.py -l tag:opera dumas -x hamilton -d "best category" -t "best category!"
+
+Sync to your Kindle all ebooks in the library with the tag *sf/space opera*, but not the Peter
+F. Hamilton books you just read, and also everything by Alexandre Dumas:
+
+    python librarian.py -l tag:opera dumas -x hamilton -k
+
+
+## LibrarianSync
 
 This is the part that generates the Kindle collections from a json file.
 It can be used completely independantly of librarian.py, provided the
@@ -161,7 +230,6 @@ which contains two entries:
 - *Rebuild all collections (from folders)* :
     to clear all existing collections and rebuild them using the folder structure
     inside the **documents** folder.
-
 
 ### What it does
 
