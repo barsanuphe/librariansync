@@ -13,6 +13,9 @@ import os, subprocess, shutil, sys, hashlib, zipfile
 import xml.dom.minidom, codecs
 import time, concurrent.futures, multiprocessing, json, argparse
 
+from librarianlib.ebook import Ebook
+from librarianlib.ebook_search import EbookSearch
+
 if sys.version_info < (3,0,0):
   print("You need python 3.0 or later to run this script.")
   sys.exit(-1)
@@ -20,7 +23,7 @@ if sys.version_info < (3,0,0):
 try:
     assert subprocess.call(["ebook-convert","--version"], stdout=subprocess.DEVNULL) == 0
 except AssertionError as err:
-    print("Calibre must be installed!")
+    print("Calibre must be installed for epub -> mobi conversions!")
     sys.exit(-1)
 
 try:
@@ -57,229 +60,6 @@ def refresh_global_variables():
         os.makedirs(LIBRARY_DIR)
     if not os.path.exists(KINDLE_DIR):
         os.makedirs(KINDLE_DIR)
-
-class Ebook(object):
-
-    def __init__(self, path):
-        self.path = path
-        self.is_imported = False
-        self.is_metadata_complete = False
-        self.author = "Various"
-        self.title = "Title"
-        self.tags = []
-        self.series_info = ""
-        self.date = 0
-        self.format = os.path.splitext(self.path)[1][1:].lower() # extension without the .
-        self.was_converted_to_mobi = False
-        self.converted_to_mobi_from_hash = ""
-        self.converted_to_mobi_hash = ""
-        self.last_synced_hash = ""
-
-    @property
-    def current_hash(self):
-        return hashlib.sha1(open(self.path, 'rb').read()).hexdigest()
-
-    @property
-    def filename(self):
-        return "%s/%s (%s) %s.%s"%(self.author, self.author, self.date, self.title, self.format)
-
-    @property
-    def exported_filename(self):
-        return os.path.splitext(self.filename)[0] + ".mobi"
-
-    def get_epub_metadata(self):
-        # prepare to read from the .epub file
-        zip = zipfile.ZipFile(self.path)
-
-        # find the contents metafile
-        txt = zip.read('META-INF/container.xml')
-        tree = xml.dom.minidom.parseString(txt)
-        rootfile = tree.getElementsByTagName("rootfile")[0]
-        filename = rootfile.getAttribute("full-path")
-
-        # grab the metadata block from the contents metafile
-        cf = zip.read(filename)
-        tree = xml.dom.minidom.parseString(cf)
-        try:
-            md = tree.getElementsByTagName("metadata")[0]
-        except:
-            md = tree.getElementsByTagName("opf:metadata")[0]
-        res = {}
-        for child in md.childNodes:
-            if child.nodeName == "meta":
-                if child.hasAttribute("name") and child.getAttribute("name") == "calibre:series":
-                    res["series"] = child.getAttribute("content")
-                elif child.hasAttribute("name") and child.getAttribute("name") == "calibre:series_index":
-                    res["series_index"] = child.getAttribute("content")
-
-            elif child.hasChildNodes() and child.firstChild.nodeType == xml.dom.Node.TEXT_NODE:
-                if child.nodeName in list(res.keys()):
-                    res[child.nodeName].append(child.firstChild.data)
-                else:
-                    res[child.nodeName] = [child.firstChild.data]
-        return res
-
-    def sanitize_epub_metadata(self, md_dict):
-        res = {}
-        try:
-            if len(md_dict["dc:creator"]) >= 2:
-                res["author"] = "Various"
-            else:
-                res["author"] = md_dict["dc:creator"][0]
-                if ',' in res["author"]:
-                    parts = res["author"].split(",")
-                    if len(parts) == 2:
-                        res["author"] = "%s %s"%(parts[1].strip(), parts[0].strip())
-                    if len(parts) > 2:
-                        res["author"] = "Various"
-            res["author"] = res["author"].title()
-            res["title"] = md_dict["dc:title"][0].replace(":", "").replace("?","").replace("/", "-").title()
-            res["year"] = int(md_dict["dc:date"][0][:4])
-            res["lang"] = md_dict["dc:language"][0]
-            if "series" in list(md_dict.keys()):
-                res["series"] = md_dict["series"].title()
-            if "series_index" in list(md_dict.keys()):
-                res["series_index"] = int(float(md_dict["series_index"]))
-
-        except Exception as err:
-            print("!!!!! ", err, "!!!! \n")
-            return None
-        return res
-
-    def read_metadata(self):
-        try:
-            all_metadata = self.get_epub_metadata()
-            md_dict = self.sanitize_epub_metadata(all_metadata)
-        except Exception as err:
-            print("Impossible to read metadata for ", self.path, err)
-            return False
-        try:
-            self.author = md_dict["author"]
-            if self.author in list(AUTHOR_ALIASES.keys()):
-                self.author = AUTHOR_ALIASES[self.author]
-            self.title = md_dict["title"]
-            self.date = int(md_dict["year"])
-
-            if "series" in list(md_dict.keys()):
-                self.series_info = md_dict["series"]
-                if "series_index" in list(md_dict.keys()):
-                    self.series_info += " (#%s)"%md_dict["series_index"]
-
-            self.is_metadata_complete = True
-            self.rename_from_metadata()
-
-        except Exception as err:
-            print("Incomplete metadata for ", self.path, err)
-            return False
-
-        return True
-
-    def rename_from_metadata(self):
-        if self.is_metadata_complete and LIBRARY_DIR in self.path:
-            new_name = os.path.join(LIBRARY_DIR, self.filename)
-            if new_name != self.path:
-                if not os.path.exists( os.path.dirname(new_name) ):
-                    print("Creating directory", os.path.dirname(new_name) )
-                    os.makedirs( os.path.dirname(new_name) )
-                print("Renaming to ", new_name)
-                shutil.move(self.path, new_name)
-                # refresh name
-                self.path = new_name
-
-    def export_to_mobi(self):
-        output_filename = os.path.join(KINDLE_DIR, self.exported_filename)
-        if os.path.exists(output_filename):
-            # check if ebook has changed since the mobi was created
-            if self.current_hash == self.converted_to_mobi_from_hash:
-                self.was_converted_to_mobi = True
-                return
-
-        if not os.path.exists( os.path.dirname(output_filename) ):
-            print("Creating directory", os.path.dirname(output_filename) )
-            os.makedirs( os.path.dirname(output_filename) )
-
-        #conversion
-        print("   + Converting to .mobi: ", self.filename)
-        subprocess.call(['ebook-convert', self.path, output_filename, "--output-profile", "kindle_pw"], stdout=subprocess.DEVNULL)
-
-        self.converted_to_mobi_hash = hashlib.sha1(open(output_filename, 'rb').read()).hexdigest()
-        self.converted_to_mobi_from_hash = self.current_hash
-        self.was_converted_to_mobi = True
-
-    def add_to_collection(self, tag):
-        if tag.strip() != "" and tag.strip().lower() not in self.tags:
-            self.tags.append(tag.strip().lower())
-
-    def remove_from_collection(self, tag):
-        if tag.strip() != "" and tag.strip().lower() in self.tags:
-            self.tags.remove(tag.strip().lower())
-
-    def sync_with_kindle(self):
-        if not os.path.exists(KINDLE_ROOT):
-            print("Kindle is not connected/mounted. Abandon ship.")
-            return
-
-        if not os.path.exists(KINDLE_DOCUMENTS):
-            os.makedirs(KINDLE_DOCUMENTS)
-
-        if not self.was_converted_to_mobi:
-            self.export_to_mobi()
-
-        output_filename = os.path.join(KINDLE_DOCUMENTS, self.exported_filename)
-
-        if not os.path.exists( os.path.dirname(output_filename) ):
-            print("Creating directory", os.path.dirname(output_filename) )
-            os.makedirs( os.path.dirname(output_filename) )
-
-        # check if exists and with latest hash
-        if os.path.exists(output_filename) and self.last_synced_hash == self.converted_to_mobi_hash:
-            #print("   - Skipping already synced .mobi: ", self.filename)
-            return
-
-        print("   + Syncing: ", self.filename)
-        shutil.copy( os.path.join(KINDLE_DIR, self.exported_filename), output_filename)
-        self.last_synced_hash = self.converted_to_mobi_hash
-
-    def __str__(self):
-        if self.series_info != "":
-            series_info = "[ %s ]"%self.series_info
-        else:
-            series_info = ""
-        if self.tags == []:
-            return "%s (%s) %s %s"%(self.author, self.date, self.title, series_info)
-        else:
-            return "%s (%s) %s %s [ %s ]"%(self.author, self.date, self.title, series_info, ", ".join(self.tags))
-
-    def to_dict(self):
-        return  {
-                    "author": self.author, "title": self.title,
-                    "path": self.path,  "tags": ",".join(sorted([el for el in self.tags if el.strip() != ""])),
-                    "date": self.date, "series_info" : self.series_info,
-                    "last_synced_hash": self.last_synced_hash, "converted_to_mobi_hash": self.converted_to_mobi_hash, "converted_to_mobi_from_hash": self.converted_to_mobi_from_hash
-                }
-
-
-    def to_json(self):
-        exported_tags = ['"%s"'%tag for tag in self.tags]
-        return """\t"%s": [%s],\n"""%(os.path.join(KINDLE_DOCUMENTS_SUBDIR, self.exported_filename), ",".join(exported_tags))
-
-    def try_to_load_from_json(self, everything, filename):
-        if not os.path.exists(everything[filename]["path"]):
-            print("File %s in DB cannot be found, ignoring."%everything[filename]["path"])
-            return False
-        try:
-            self.author = everything[filename]['author']
-            self.title = everything[filename]['title']
-            self.tags = [el.lower().strip() for el in everything[filename]['tags'].split(",") if el.strip() != ""]
-            self.date = everything[filename]['date']
-            self.converted_to_mobi_hash = everything[filename]['converted_to_mobi_hash']
-            self.converted_to_mobi_from_hash = everything[filename]['converted_to_mobi_from_hash']
-            self.last_synced_hash = everything[filename]['last_synced_hash']
-            self.series_info = everything[filename]['series_info']
-        except Exception as err:
-            print("Incorrect db!", err)
-            return False
-        return True
 
 class Library(object):
     def __init__(self):
@@ -321,11 +101,10 @@ class Library(object):
     def save_config(self):
         yaml.dump(self.config, open(LIBRARY_CONFIG, 'w'), indent=4, default_flow_style=False, allow_unicode=True)
 
-
     def _load_ebook(self, everything, filename):
         if not "path" in list(everything[filename].keys()):
             return False, None
-        eb = Ebook(everything[filename]["path"])
+        eb = Ebook(everything[filename]["path"], LIBRARY_DIR, AUTHOR_ALIASES)
         return eb.try_to_load_from_json(everything, filename), eb
 
     def open_db(self):
@@ -352,7 +131,7 @@ class Library(object):
                 eb.read_metadata()
                 return eb
         if not is_already_in_db:
-            eb = Ebook( full_path )
+            eb = Ebook( full_path, LIBRARY_DIR, AUTHOR_ALIASES )
             eb.read_metadata()
             print(" ->  NEW EBOOK: ", eb)
             return eb
@@ -482,9 +261,9 @@ class Library(object):
                 continue
 
             # check for complete metadata
-            temp_ebook = Ebook(ebook_candidate_full_path)
-            is_complete = temp_ebook.read_metadata()
-            if not is_complete:
+            temp_ebook = Ebook(ebook_candidate_full_path, LIBRARY_DIR, AUTHOR_ALIASES)
+            temp_ebook.read_metadata()
+            if not temp_ebook.metadata.is_complete:
                 print(" -> skipping ebook with incomplete metadata: ",  ebook )
                 continue
 
@@ -534,7 +313,7 @@ class Library(object):
         tags_json = "{\n"
         for eb in sorted(ebooks_to_sync, key=lambda x: x.filename):
             if eb.tags != [""]:
-                tags_json += eb.to_json()
+                tags_json += eb.to_json(KINDLE_DOCUMENTS_SUBDIR)
         tags_json = tags_json[:-2] # remove last ","
         tags_json += "\n}\n"
 
@@ -552,6 +331,9 @@ class Library(object):
         if not os.path.exists(KINDLE_ROOT):
             print("Kindle is not connected/mounted. Abandon ship.")
             return
+        if not os.path.exists(KINDLE_DOCUMENTS):
+            os.makedirs(KINDLE_DOCUMENTS)
+
         start = time.perf_counter()
         # lister les mobi sur le kindle
         print(" -> Listing existing ebooks.")
@@ -563,7 +345,7 @@ class Library(object):
         print(" -> Syncing library.")
         cpt = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
-            all_sync = { executor.submit(eb.sync_with_kindle): eb for eb in sorted(ebooks_to_sync, key=lambda x: x.filename)}
+            all_sync = { executor.submit(eb.sync_with_kindle, KINDLE_DIR, KINDLE_DOCUMENTS): eb for eb in sorted(ebooks_to_sync, key=lambda x: x.filename)}
             for future in concurrent.futures.as_completed(all_sync):
                 ebook = all_sync[future]
                 print(" %.2f%%"%( 100*cpt/len(self.ebooks)), end="\r", flush=True)
@@ -589,107 +371,13 @@ class Library(object):
         found_incomplete = False
         incomplete_list = ""
         for eb in self.ebooks:
-            if not eb.is_metadata_complete:
+            if not eb.metadata.is_complete:
                 found_incomplete = True
                 incomplete_list += " -> %s\n"%eb.path
         if found_incomplete:
             print("The following ebooks have incomplete metadata:")
             print(incomplete_list)
         return found_incomplete
-
-    def search_ebooks(self, search_string, exact_search = False):
-        filtered = []
-        search_string = search_string.lower()
-        for eb in self.ebooks:
-            if search_string.startswith("series:"):
-                if (not exact_search and search_string.split("series:")[1].strip() in eb.series_info.lower()) \
-                    or (exact_search and search_string.split("series:")[1].strip() == eb.series_info.lower()):   #TODO: not ideal for exact search..
-                    filtered.append(eb)
-            elif search_string.startswith("author:"):
-                if (not exact_search and search_string.split("author:")[1].strip() in eb.author.lower()) \
-                    or (exact_search and search_string.split("author:")[1].strip() == eb.author.lower()):
-                    filtered.append(eb)
-            elif search_string.startswith("title:"):
-                if (not exact_search and search_string.split("title:")[1].strip() in eb.title.lower()) \
-                    or (exact_search and search_string.split("title:")[1].strip() == eb.title.lower()):
-                    filtered.append(eb)
-            elif search_string.startswith("tag:"):
-                tag_to_search_for = search_string.split("tag:")[1].strip()
-                for tag in eb.tags:
-                    if (not exact_search and tag_to_search_for in tag) \
-                        or (exact_search and tag_to_search_for == tag):
-                        filtered.append(eb)
-                        break # at least one match is good enough
-            elif (not exact_search and (search_string.lower() in eb.series_info.lower() or search_string.lower() in eb.author.lower() or search_string.lower() in eb.title.lower() or search_string.lower() in eb.tags)) \
-                or (exact_search and (search_string.lower() == eb.series_info.lower() or search_string.lower() == eb.author.lower() or search_string.lower() == eb.title.lower() or search_string.lower() in eb.tags)):
-                filtered.append(eb)
-        return sorted(filtered, key=lambda x: x.filename)
-
-    def exclude_ebooks(self, ebooks_list, exclude_term):
-        filtered = []
-        exclude_term = exclude_term.lower()
-        for eb in ebooks_list:
-            if exclude_term.startswith("series:"):
-                if exclude_term.split("series:")[1].strip() not in eb.series_info.lower():
-                    filtered.append(eb)
-            elif exclude_term.startswith("author:"):
-                if exclude_term.split("author:")[1].strip() not in eb.author.lower():
-                    filtered.append(eb)
-            elif exclude_term.startswith("title:"):
-                if exclude_term.split("title:")[1].strip() not in eb.title.lower():
-                    filtered.append(eb)
-            elif exclude_term.startswith("tag:"):
-                tag_to_search_for = exclude_term.split("tag:")[1].strip()
-                not_found = True
-                for tag in eb.tags:
-                    if tag_to_search_for in tag:
-                        not_found = False
-                        break
-                if not_found:
-                    filtered.append(eb)
-            elif exclude_term.lower() not in eb.author.lower() and exclude_term.lower() not in eb.title.lower() and exclude_term.lower() not in eb.tags:
-                filtered.append(eb)
-        return sorted(filtered, key=lambda x: x.filename)
-
-    def search(self, search_list, exclude_list, additive=False):
-        complete_filtered_list_or = []
-        complete_filtered_list_and = []
-        out = []
-
-        if search_list == []:
-            out = self.ebooks
-        else:
-            for library_filter in search_list:
-                filtered = self.search_ebooks(library_filter)
-                complete_filtered_list_or.extend([el for el in filtered if el not in complete_filtered_list_or])
-                if complete_filtered_list_and == []:
-                    complete_filtered_list_and = filtered
-                else:
-                    complete_filtered_list_and = [el for el in complete_filtered_list_and if el in filtered]
-            if additive:
-                out =  complete_filtered_list_and
-            else:
-                out =  complete_filtered_list_or
-
-        if exclude_list is not None:
-            for exclude in exclude_list:
-                out = self.exclude_ebooks(out, exclude)
-
-        return sorted(out, key=lambda x: x.filename)
-
-    def list_tags(self):
-        all_tags = {}
-        all_tags["untagged"] = 0
-        for ebook in self.ebooks:
-            if ebook.tags == []:
-                all_tags["untagged"] += 1
-            else:
-                for tag in ebook.tags:
-                    if tag in list(all_tags.keys()):
-                        all_tags[tag] += 1
-                    else:
-                        all_tags[tag] = 1
-        return all_tags
 
 if __name__ == "__main__":
 
@@ -745,20 +433,21 @@ if __name__ == "__main__":
 
         # filtering
         filtered = []
+        s = EbookSearch(l.ebooks)
         if args.collections is not None:
             if args.collections == "":
-                all_tags = l.list_tags()
+                all_tags = s.list_tags()
                 for tag in sorted(list(all_tags.keys())):
                     print(" -> %s (%s)"%(tag, all_tags[tag]))
             elif args.collections == "untagged":
-                filtered = l.search([""], ["tag:"], additive = False)
+                filtered = s.search([""], ["tag:"], additive = False)
             else:
-                filtered = l.search_ebooks('tag:%s'%args.collections, exact_search = True)
+                filtered = s.search_ebooks('tag:%s'%args.collections, exact_search = True)
 
         if args.filter_ebooks_and is not None:
-            filtered = l.search(args.filter_ebooks_and, args.filter_exclude, additive = True)
+            filtered = s.search(args.filter_ebooks_and, args.filter_exclude, additive = True)
         elif args.filter_ebooks_or is not None:
-            filtered = l.search(args.filter_ebooks_or, args.filter_exclude, additive = False)
+            filtered = s.search(args.filter_ebooks_or, args.filter_exclude, additive = False)
 
         # add/remove tags
         if args.add_tag is not None and filtered != []:
