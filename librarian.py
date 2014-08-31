@@ -4,9 +4,9 @@
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
 #TODO: preview?
 #TODO: support for several series?
-#TODO: exact search series?
-#TODO: remove empty dirs when syncing and deleting mobis
+#TODO: exact search series? + series index
 #TODO: dc:subject list?
+#TODO: inexact tag search
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
@@ -159,6 +159,11 @@ class Library(object):
         to_delete = [ eb for eb in old_db if eb not in self.ebooks]
         for eb in to_delete:
            print(" -> DELETED EBOOK: ", eb)
+
+        # remove empty dirs in LIBRARY_DIR
+        for root, dirs, files in os.walk(LIBRARY_DIR, topdown=False):
+            for dir in [os.path.join(root, el) for el in dirs if os.listdir( os.path.join(root, el)) == []]:
+                os.rmdir(dir)
 
         if self.wanted != {}:
             for ebook in self.ebooks:
@@ -335,7 +340,7 @@ class Library(object):
             os.makedirs(KINDLE_DOCUMENTS)
 
         start = time.perf_counter()
-        # lister les mobi sur le kindle
+        # list all mobi files in KINDLE_DOCUMENTS
         print(" -> Listing existing ebooks.")
         all_mobi_ebooks = []
         for root, dirs, files in os.walk(KINDLE_DOCUMENTS):
@@ -359,7 +364,10 @@ class Library(object):
         for mobi in all_mobi_ebooks:
             print("    + ", mobi)
             os.remove(mobi)
-        #TODO: remove empty dirs
+        # remove empty dirs in KINDLE_DOCUMENTS
+        for root, dirs, files in os.walk(KINDLE_DOCUMENTS, topdown=False):
+            for dir in [os.path.join(root, el) for el in dirs if os.listdir( os.path.join(root, el)) == []]:
+                os.rmdir(dir)
 
         # sync collections.json
         print(" -> Generating and copying database for collection generation.")
