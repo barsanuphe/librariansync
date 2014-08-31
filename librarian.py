@@ -2,10 +2,15 @@
 # -*- coding: utf-8 -*-
 
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
+#TODO: preview?
+#TODO: support for several series?
+#TODO: exact search series
+#TODO: remove empty dirs when syncing and deleting mobis
+#TODO: dc:subject list?
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
-import xml.dom.minidom
+import xml.dom.minidom, codecs
 import time, concurrent.futures, multiprocessing, json, argparse
 
 if sys.version_info < (3,0,0):
@@ -62,6 +67,7 @@ class Ebook(object):
         self.author = "Various"
         self.title = "Title"
         self.tags = []
+        self.series_info = ""
         self.date = 0
         self.format = os.path.splitext(self.path)[1][1:].lower() # extension without the .
         self.was_converted_to_mobi = False
@@ -100,7 +106,13 @@ class Ebook(object):
             md = tree.getElementsByTagName("opf:metadata")[0]
         res = {}
         for child in md.childNodes:
-            if child.hasChildNodes() and child.firstChild.nodeType == xml.dom.Node.TEXT_NODE:
+            if child.nodeName == "meta":
+                if child.hasAttribute("name") and child.getAttribute("name") == "calibre:series":
+                    res["series"] = child.getAttribute("content")
+                elif child.hasAttribute("name") and child.getAttribute("name") == "calibre:series_index":
+                    res["series_index"] = child.getAttribute("content")
+
+            elif child.hasChildNodes() and child.firstChild.nodeType == xml.dom.Node.TEXT_NODE:
                 if child.nodeName in list(res.keys()):
                     res[child.nodeName].append(child.firstChild.data)
                 else:
@@ -124,6 +136,11 @@ class Ebook(object):
             res["title"] = md_dict["dc:title"][0].replace(":", "").replace("?","").replace("/", "-").title()
             res["year"] = int(md_dict["dc:date"][0][:4])
             res["lang"] = md_dict["dc:language"][0]
+            if "series" in list(md_dict.keys()):
+                res["series"] = md_dict["series"].title()
+            if "series_index" in list(md_dict.keys()):
+                res["series_index"] = int(float(md_dict["series_index"]))
+
         except Exception as err:
             print("!!!!! ", err, "!!!! \n")
             return None
@@ -133,8 +150,8 @@ class Ebook(object):
         try:
             all_metadata = self.get_epub_metadata()
             md_dict = self.sanitize_epub_metadata(all_metadata)
-        except:
-            print("Impossible to read metadata for ", self.path)
+        except Exception as err:
+            print("Impossible to read metadata for ", self.path, err)
             return False
         try:
             self.author = md_dict["author"]
@@ -142,6 +159,12 @@ class Ebook(object):
                 self.author = AUTHOR_ALIASES[self.author]
             self.title = md_dict["title"]
             self.date = int(md_dict["year"])
+
+            if "series" in list(md_dict.keys()):
+                self.series_info = md_dict["series"]
+                if "series_index" in list(md_dict.keys()):
+                    self.series_info += " (#%s)"%md_dict["series_index"]
+
             self.is_metadata_complete = True
             self.rename_from_metadata()
 
@@ -218,16 +241,20 @@ class Ebook(object):
         self.last_synced_hash = self.converted_to_mobi_hash
 
     def __str__(self):
-        if self.tags == []:
-            return "%s (%s) %s"%(self.author, self.date, self.title)
+        if self.series_info != "":
+            series_info = "[ %s ]"%self.series_info
         else:
-            return "%s (%s) %s [ %s ]"%(self.author, self.date, self.title, ", ".join(self.tags))
+            series_info = ""
+        if self.tags == []:
+            return "%s (%s) %s %s"%(self.author, self.date, self.title, series_info)
+        else:
+            return "%s (%s) %s %s [ %s ]"%(self.author, self.date, self.title, series_info, ", ".join(self.tags))
 
     def to_dict(self):
         return  {
                     "author": self.author, "title": self.title,
                     "path": self.path,  "tags": ",".join(sorted([el for el in self.tags if el.strip() != ""])),
-                    "date": self.date,
+                    "date": self.date, "series_info" : self.series_info,
                     "last_synced_hash": self.last_synced_hash, "converted_to_mobi_hash": self.converted_to_mobi_hash, "converted_to_mobi_from_hash": self.converted_to_mobi_from_hash
                 }
 
@@ -248,6 +275,7 @@ class Ebook(object):
             self.converted_to_mobi_hash = everything[filename]['converted_to_mobi_hash']
             self.converted_to_mobi_from_hash = everything[filename]['converted_to_mobi_from_hash']
             self.last_synced_hash = everything[filename]['last_synced_hash']
+            self.series_info = everything[filename]['series_info']
         except Exception as err:
             print("Incorrect db!", err)
             return False
@@ -510,7 +538,12 @@ class Library(object):
         f.write(tags_json)
         f.close()
 
-    def sync_with_kindle(self):
+    def sync_with_kindle(self, filtered = []):
+        if filtered == []:
+            ebooks_to_sync = self.ebooks
+        else:
+            ebooks_to_sync = filtered
+
         print("Syncing with kindle.")
         if not os.path.exists(KINDLE_ROOT):
             print("Kindle is not connected/mounted. Abandon ship.")
@@ -526,7 +559,7 @@ class Library(object):
         print(" -> Syncing library.")
         cpt = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
-            all_sync = { executor.submit(eb.sync_with_kindle): eb for eb in sorted(self.ebooks, key=lambda x: x.filename)}
+            all_sync = { executor.submit(eb.sync_with_kindle): eb for eb in sorted(ebooks_to_sync, key=lambda x: x.filename)}
             for future in concurrent.futures.as_completed(all_sync):
                 ebook = all_sync[future]
                 print(" %.2f%%"%( 100*cpt/len(self.ebooks)), end="\r", flush=True)
@@ -540,6 +573,8 @@ class Library(object):
         for mobi in all_mobi_ebooks:
             print("    + ", mobi)
             os.remove(mobi)
+        #TODO: remove empty dirs
+
 
         # sync collections.json
         print(" -> Generating and copying database for collection generation.")
@@ -563,7 +598,11 @@ class Library(object):
         filtered = []
         search_string = search_string.lower()
         for eb in self.ebooks:
-            if search_string.startswith("author:"):
+            if search_string.startswith("series:"):
+                if (not exact_search and search_string.split("series:")[1].strip() in eb.series_info.lower()) \
+                    or (exact_search and search_string.split("series:")[1].strip() == eb.series_info.lower()):   #TODO: not ideal for exact search..
+                    filtered.append(eb)
+            elif search_string.startswith("author:"):
                 if (not exact_search and search_string.split("author:")[1].strip() in eb.author.lower()) \
                     or (exact_search and search_string.split("author:")[1].strip() == eb.author.lower()):
                     filtered.append(eb)
@@ -578,8 +617,8 @@ class Library(object):
                         or (exact_search and tag_to_search_for == tag):
                         filtered.append(eb)
                         break # at least one match is good enough
-            elif (not exact_search and (search_string.lower() in eb.author.lower() or search_string.lower() in eb.title.lower() or search_string.lower() in eb.tags)) \
-                or (exact_search and (search_string.lower() == eb.author.lower() or search_string.lower() == eb.title.lower() or search_string.lower() in eb.tags)):
+            elif (not exact_search and (search_string.lower() in eb.series_info.lower() or search_string.lower() in eb.author.lower() or search_string.lower() in eb.title.lower() or search_string.lower() in eb.tags)) \
+                or (exact_search and (search_string.lower() == eb.series_info.lower() or search_string.lower() == eb.author.lower() or search_string.lower() == eb.title.lower() or search_string.lower() in eb.tags)):
                 filtered.append(eb)
         return sorted(filtered, key=lambda x: x.filename)
 
@@ -587,7 +626,10 @@ class Library(object):
         filtered = []
         exclude_term = exclude_term.lower()
         for eb in ebooks_list:
-            if exclude_term.startswith("author:"):
+            if exclude_term.startswith("series:"):
+                if exclude_term.split("series:")[1].strip() not in eb.series_info.lower():
+                    filtered.append(eb)
+            elif exclude_term.startswith("author:"):
                 if exclude_term.split("author:")[1].strip() not in eb.author.lower():
                     filtered.append(eb)
             elif exclude_term.startswith("title:"):
@@ -656,9 +698,9 @@ if __name__ == "__main__":
     group_import_export.add_argument('-i', '--import', dest='import_ebooks', action='store_true', default = False, help='import ebooks')
     group_import_export.add_argument('-r', '--refresh', dest='refresh', action='store_true', default = False, help='refresh library')
     group_import_export.add_argument('-s', '--scrape', dest='scrape', action='store_true', default = False, help='scrape for ebooks')
-    group_import_export.add_argument('-k', '--sync-kindle', dest='kindle', action='store_true', default = False, help='sync library with kindle')
+    group_import_export.add_argument('-k', '--sync-kindle', dest='kindle', action='store_true', default = False, help='sync library (or a subset with --filter or --list) with kindle')
 
-    group_tagging = parser.add_argument_group('Tagging', 'Search and tag ebooks. For --list, --filter and --exclude, STRING can begin with author:, title:, tag: for a more precise search.')
+    group_tagging = parser.add_argument_group('Tagging', 'Search and tag ebooks. For --list, --filter and --exclude, STRING can begin with author:, title:, tag:, or series: for a more precise search.')
     group_tagging.add_argument('-f', '--filter', dest='filter_ebooks_and', action='store', nargs="*", metavar="STRING", help='list ebooks in library matching ALL patterns')
     group_tagging.add_argument('-l', '--list', dest='filter_ebooks_or', action='store', nargs="*", metavar="STRING", help='list ebooks in library matching ANY pattern')
     group_tagging.add_argument('-x', '--exclude', dest='filter_exclude', action='store', nargs="+", metavar="STRING", help='exclude ALL STRINGS from current list/filter')
@@ -697,8 +739,6 @@ if __name__ == "__main__":
             if some_are_incomplete:
                 print("Fix metadata for these ebooks and run this again.")
                 sys.exit(-1)
-        if args.kindle:
-            l.sync_with_kindle()
 
         # filtering
         filtered = []
@@ -729,6 +769,12 @@ if __name__ == "__main__":
 
         for ebook in filtered:
             print(" -> ", ebook)
+
+        if args.kindle:
+            if filtered == []:
+                l.sync_with_kindle()
+            else:
+                l.sync_with_kindle(filtered)
 
         l.save_db()
 
