@@ -9,21 +9,21 @@
                     "priority": -1,
                     "exitmenu": false,
                     "status": false,
-                    "action": "python generate_collections.py rebuild &> log.txt"
+                    "action": "python generate_collections.py rebuild"
                 },
                 {
                     "name": "Add to collections (from json)",
                     "priority": -1,
                     "exitmenu": false,
                     "status": false,
-                    "action": "python generate_collections.py add &> log.txt"
+                    "action": "python generate_collections.py add"
                 },
                 {
                     "name": "Rebuild all collections (from folders)",
                     "priority": -1,
                     "exitmenu": false,
                     "status": false,
-                    "action": "python generate_collections.py rebuild_from_folders &> log.txt"
+                    "action": "python generate_collections.py rebuild_from_folders"
                 }
             ]
         }
