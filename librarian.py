@@ -5,13 +5,16 @@
 #TODO: preview?
 #TODO: support for several series?
 #TODO: dc:subject list?
+#TODO: return list when metadata has several elements of same type
+#TODO: write metadata/tags to epub
+#TODO: auto-correct option (w/author_aliases)
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
 import xml.dom.minidom, codecs
 import time, concurrent.futures, multiprocessing, json, argparse
 
-from librarianlib.ebook import Ebook
+from librarianlib.epub import Epub
 from librarianlib.ebook_search import EbookSearch
 
 if sys.version_info < (3,0,0):
@@ -68,6 +71,15 @@ class Library(object):
         self.interactive = False
         self.open_config()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        # cleaning up temp opf files
+        for epub in self.ebooks:
+            if epub.is_opf_open:
+                epub.close_metadata()
+
     def open_config(self):
         #configuration
         if os.path.exists(LIBRARY_CONFIG):
@@ -102,8 +114,8 @@ class Library(object):
     def _load_ebook(self, everything, filename):
         if not "path" in list(everything[filename].keys()):
             return False, None
-        eb = Ebook(everything[filename]["path"], LIBRARY_DIR, AUTHOR_ALIASES)
-        return eb.try_to_load_from_json(everything, filename), eb
+        eb = Epub(everything[filename]["path"], LIBRARY_DIR, AUTHOR_ALIASES)
+        return eb.load_from_database_json(everything[filename], filename), eb
 
     def open_db(self):
         self.db = []
@@ -126,11 +138,13 @@ class Library(object):
         for eb in old_db:
             if eb.path == full_path:
                 is_already_in_db = True
-                eb.read_metadata()
+                eb.open_metadata()
+                eb.rename_from_metadata()
                 return eb
         if not is_already_in_db:
-            eb = Ebook( full_path, LIBRARY_DIR, AUTHOR_ALIASES )
-            eb.read_metadata()
+            eb = Epub( full_path, LIBRARY_DIR, AUTHOR_ALIASES )
+            eb.open_metadata()
+            eb.rename_from_metadata()
             print(" ->  NEW EBOOK: ", eb)
             return eb
         return None
@@ -165,12 +179,12 @@ class Library(object):
 
         if self.wanted != {}:
             for ebook in self.ebooks:
-                if ebook.author in list(self.wanted.keys()) and self.wanted[ebook.author] in ebook.title:
-                    print("! Found WANTED ebook: %s - %s "%(ebook.author,self.wanted[ebook.author]) )
+                if ebook.metadata.author in list(self.wanted.keys()) and self.wanted[ebook.metadata.author] in ebook.metadata.title:
+                    print("! Found WANTED ebook: %s - %s "%(ebook.author,self.wanted[ebook.metadata.author]) )
                     answer = input("! Confirm this is what you were looking for: %s\ny/n? "%ebook)
                     if answer.lower() == "y":
                         print(" -> Removing from wanted list.")
-                        del self.wanted[ebook.author]
+                        del self.wanted[ebook.metadata.author]
                         self.save_config()
 
         is_incomplete = self.list_incomplete_metadata()
@@ -181,7 +195,7 @@ class Library(object):
         data = {}
         # adding ebooks in alphabetical order
         for ebook in sorted(self.ebooks, key=lambda x: x.filename):
-            data[ebook.filename] = ebook.to_dict()
+            data[ebook.filename] = ebook.to_database_json()
         # dumping in json file
         with open(LIBRARY_DB, "w") as data_file:
             data_file.write(json.dumps( data, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
@@ -264,8 +278,8 @@ class Library(object):
                 continue
 
             # check for complete metadata
-            temp_ebook = Ebook(ebook_candidate_full_path, LIBRARY_DIR, AUTHOR_ALIASES)
-            temp_ebook.read_metadata()
+            temp_ebook = Epub(ebook_candidate_full_path, LIBRARY_DIR, AUTHOR_ALIASES)
+            temp_ebook.open_metadata()
             if not temp_ebook.metadata.is_complete:
                 print(" -> skipping ebook with incomplete metadata: ",  ebook )
                 continue
@@ -273,11 +287,11 @@ class Library(object):
             # check if book not already in library
             already_in_db = False
             for eb in self.ebooks:
-                if eb.author == temp_ebook.author and eb.title == temp_ebook.title:
+                if eb.metadata.author == temp_ebook.metadata.author and eb.metadata.title == temp_ebook.metadata.title:
                     already_in_db = True
                     break
             if already_in_db:
-                print(" -> library already contains an entry for: ", temp_ebook.author, " - ", temp_ebook.title, ": ",  ebook )
+                print(" -> library already contains an entry for: ", temp_ebook.metadata.author, " - ", temp_ebook.metadata.title, ": ",  ebook )
                 continue
 
             if self.interactive:
@@ -313,15 +327,13 @@ class Library(object):
             ebooks_to_sync = self.ebooks
         else:
             ebooks_to_sync = filtered
-        tags_json = "{\n"
+        tags_json = {}
         for eb in sorted(ebooks_to_sync, key=lambda x: x.filename):
             if eb.tags != [""]:
-                tags_json += eb.to_json(KINDLE_DOCUMENTS_SUBDIR)
-        tags_json = tags_json[:-2] # remove last ","
-        tags_json += "\n}\n"
+                tags_json[os.path.join(KINDLE_DOCUMENTS_SUBDIR, eb.exported_filename)] = eb.tags
 
         f = codecs.open(outfile, "w", "utf8")
-        f.write(tags_json)
+        f.write(json.dumps(tags_json, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
         f.close()
 
     def sync_with_kindle(self, filtered = []):
@@ -418,66 +430,65 @@ if __name__ == "__main__":
         print("Tagging all ebooks, or removing a tag from all ebooks, arguably makes no sense. Use the --list/--filter options to filter among the library.")
         sys.exit()
 
-    try:
-        l = Library()
-        l.open_db()
-    except Exception as err:
-        print("Error loading DB: ", err)
-        sys.exit(-1)
+    with Library() as l:
+        try:
+            l.open_db()
+        except Exception as err:
+            print("Error loading DB: ", err)
+            sys.exit(-1)
 
-    try:
-        if args.scrape:
-            l.scrape_dir_for_ebooks()
-        if args.import_ebooks:
-            if l.import_new_ebooks():
-                args.refresh = True
-        if args.refresh:
-            some_are_incomplete = l.refresh_db()
-            if some_are_incomplete:
-                print("Fix metadata for these ebooks and run this again.")
-                sys.exit(-1)
+        try:
+            if args.scrape:
+                l.scrape_dir_for_ebooks()
+            if args.import_ebooks:
+                if l.import_new_ebooks():
+                    args.refresh = True
+            if args.refresh:
+                some_are_incomplete = l.refresh_db()
+                if some_are_incomplete:
+                    print("Fix metadata for these ebooks and run this again.")
+                    sys.exit(-1)
 
-        # filtering
-        filtered = []
-        s = EbookSearch(l.ebooks)
-        if args.collections is not None:
-            if args.collections == "":
-                all_tags = s.list_tags()
-                for tag in sorted(list(all_tags.keys())):
-                    print(" -> %s (%s)"%(tag, all_tags[tag]))
-            elif args.collections == "untagged":
-                filtered = s.search([""], ["tag:"], additive = False)
-            else:
-                filtered = s.search_ebooks('tag:%s'%args.collections, exact_search = True)
+            # filtering
+            filtered = []
+            s = EbookSearch(l.ebooks)
+            if args.collections is not None:
+                if args.collections == "":
+                    all_tags = s.list_tags()
+                    for tag in sorted(list(all_tags.keys())):
+                        print(" -> %s (%s)"%(tag, all_tags[tag]))
+                elif args.collections == "untagged":
+                    filtered = s.search([""], ["tag:"], additive = False)
+                else:
+                    filtered = s.search_ebooks('tag:%s'%args.collections, exact_search = True)
 
-        if args.filter_ebooks_and is not None:
-            filtered = s.search(args.filter_ebooks_and, args.filter_exclude, additive = True)
-        elif args.filter_ebooks_or is not None:
-            filtered = s.search(args.filter_ebooks_or, args.filter_exclude, additive = False)
+            if args.filter_ebooks_and is not None:
+                filtered = s.search(args.filter_ebooks_and, args.filter_exclude, additive = True)
+            elif args.filter_ebooks_or is not None:
+                filtered = s.search(args.filter_ebooks_or, args.filter_exclude, additive = False)
 
-        # add/remove tags
-        if args.add_tag is not None and filtered != []:
+            # add/remove tags
+            if args.add_tag is not None and filtered != []:
+                for ebook in filtered:
+                    for tag in args.add_tag:
+                        ebook.add_to_collection(tag)
+            if args.delete_tag is not None and filtered != []:
+                for ebook in filtered:
+                    for tag in args.delete_tag:
+                        ebook.remove_from_collection(tag)
+
             for ebook in filtered:
-                for tag in args.add_tag:
-                    ebook.add_to_collection(tag)
-        if args.delete_tag is not None and filtered != []:
-            for ebook in filtered:
-                for tag in args.delete_tag:
-                    ebook.remove_from_collection(tag)
+                print(" -> ", ebook)
 
-        for ebook in filtered:
-            print(" -> ", ebook)
+            if args.kindle:
+                if filtered == []:
+                    l.sync_with_kindle()
+                else:
+                    l.sync_with_kindle(filtered)
 
-        if args.kindle:
-            if filtered == []:
-                l.sync_with_kindle()
-            else:
-                l.sync_with_kindle(filtered)
+            l.save_db()
+        except Exception as err:
+            print(err)
+            sys.exit(-1)
 
-        l.save_db()
-
-    except Exception as err:
-        print(err)
-        sys.exit(-1)
-
-    print("Everything done in %.2fs."%(time.perf_counter() - start))
+        print("Everything done in %.2fs."%(time.perf_counter() - start))

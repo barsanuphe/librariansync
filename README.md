@@ -1,7 +1,7 @@
 # Librarian & LibrarianSync
 
 Epub Ebook manager that can sync to a Kindle Paperwhite and automatically create
-collections from tags.
+collections from tags (or folders).
 
 ## What it is
 
