@@ -261,6 +261,11 @@ This script is inspired by
 Once the requirements are met, just copy the **librariansync** folder into the
 **extensions** folder on the kindle.
 
+Alternatively, it is possible to build a kindle update package using
+[KindleTool](https://github.com/NiLuJe/KindleTool) by running
+*tools/build-librariansync-bin.sh*.
+This .bin package is then installable through the Kindle interface.
+
 ### Usage
 
 From the Kindle, launch KUAL. A new menu option *Librarian Sync* should appear,
