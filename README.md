@@ -106,8 +106,9 @@ Note: if python2 is the default version on your Linux distribution, launch with 
                         [-t ADD_TAG [ADD_TAG ...]]
                         [-d DELETE_TAG [DELETE_TAG ...]] [-c [COLLECTIONS]]
                         [--info [METADATA_FIELD [METADATA_FIELD ...]]]
+                        [--config CONFIG_FILE]
 
-    Librarian.
+    Librarian. A very early version of it.
 
     optional arguments:
     -h, --help            show this help message and exit
@@ -144,6 +145,13 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     --info [METADATA_FIELD [METADATA_FIELD ...]]
                             Display all or a selection of metadata tags for
                             filtered ebooks.
+
+    Configuration:
+    Configuration options.
+
+    --config CONFIG_FILE  Use an alternative configuration file.
+
+
 
 While syncing with Kindle, *librarian.py* will keep track of previous conversions
 to the mobi format (for epub ebooks), and of previously synced ebooks on the Kindle,

@@ -4,10 +4,14 @@
 #TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
 #TODO: preview?
 #TODO: support for several series?
-#TODO: dc:subject list?
+#TODO: tags == dc:subject list?
 #TODO: return list when metadata has several elements of same type
-#TODO: write metadata/tags to epub
-#TODO: auto-correct option (w/author_aliases)
+#TODO: --write-metadata to epub
+#TODO: auto-correct option (w/author_aliases) + yaml option confirm_before_write
+#TODO: extract from tags the property "was read"
+#TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
+#TODO: try to query google books to get additionnal book info such as original publication date
+#TODO: when querying by series, order by series_index
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
@@ -37,7 +41,6 @@ except Exception as err:
 librarian_dir = os.path.dirname(os.path.realpath(__file__))
 LIBRARY_DB = os.path.join(librarian_dir, "library.json")
 LIBRARY_CONFIG = os.path.join(librarian_dir, "librarian.yaml")
-
 
 KINDLE_DOCUMENTS_SUBDIR = "library"
 AUTHOR_ALIASES = {}
@@ -401,7 +404,7 @@ if __name__ == "__main__":
 
     start = time.perf_counter()
 
-    parser = argparse.ArgumentParser(description='Librarian.')
+    parser = argparse.ArgumentParser(description='Librarian. A very early version of it.')
 
     group_import_export = parser.add_argument_group('Library management', 'Import, analyze, and sync with Kindle.')
     group_import_export.add_argument('-i', '--import', dest='import_ebooks', action='store_true', default = False, help='import ebooks')
@@ -420,6 +423,9 @@ if __name__ == "__main__":
     group_tagging = parser.add_argument_group('Metadata', 'Display and write epub metadata.')
     group_tagging.add_argument('--info', dest='info', action='store', metavar="METADATA_FIELD", nargs='*', help='Display all or a selection of metadata tags for filtered ebooks.')
 
+    group_tagging = parser.add_argument_group('Configuration', 'Configuration options.')
+    group_tagging.add_argument('--config', dest='config', action='store', metavar="CONFIG_FILE", nargs=1, help='Use an alternative configuration file.')
+
     args = parser.parse_args()
 
     # a few checks on the arguments
@@ -434,6 +440,17 @@ if __name__ == "__main__":
     if (args.add_tag is not None or args.delete_tag is not None) and (args.filter_ebooks_and is None or args.filter_ebooks_and == []) and (args.filter_ebooks_or is None or args.filter_ebooks_or == []) :
         print("Tagging all ebooks, or removing a tag from all ebooks, arguably makes no sense. Use the --list/--filter options to filter among the library.")
         sys.exit()
+
+    if args.config is not None:
+        config_filename = args.config[0]
+        if os.path.isabs(config_filename):
+            if os.path.exists(config_filename):
+                LIBRARY_CONFIG = config_filename
+        else:
+            config_filename = os.path.join(librarian_dir, config_filename)
+            if os.path.exists(config_filename):
+                LIBRARY_CONFIG = config_filename
+
 
     with Library() as l:
         try:
