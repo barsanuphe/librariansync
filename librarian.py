@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-#TODO: add pattern in config for naming ebooks, something like: $author/$author ($date) $title
+#TODO: filename template: support for optional parts (ex: "[$s] [#$i]")
 #TODO: preview?
 #TODO: support for several series?
 #TODO: tags == dc:subject list?
@@ -12,6 +12,7 @@
 #TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
 #TODO: try to query google books to get additionnal book info such as original publication date
 #TODO: when querying by series, order by series_index
+#TODO: solve exception for concurrent folder creation on refresh
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
@@ -72,6 +73,7 @@ class Library(object):
         self.scrape_root = None
         self.wanted = {}
         self.interactive = False
+        self.ebook_filename_template = "$a/$a ($y) $t"
         self.open_config()
 
     def __enter__(self):
@@ -110,6 +112,7 @@ class Library(object):
                 self.wanted = self.config["wanted"]
             if "interactive" in list(self.config.keys()):
                 self.interactive = self.config["interactive"]
+            self.ebook_filename_template = self.config.get("ebook_filename_template", "$a/$a ($y) $t")
 
     def save_config(self):
         yaml.dump(self.config, open(LIBRARY_CONFIG, 'w'), indent=4, default_flow_style=False, allow_unicode=True)
@@ -117,7 +120,7 @@ class Library(object):
     def _load_ebook(self, everything, filename):
         if not "path" in list(everything[filename].keys()):
             return False, None
-        eb = Epub(everything[filename]["path"], LIBRARY_DIR, AUTHOR_ALIASES)
+        eb = Epub(everything[filename]["path"], LIBRARY_DIR, AUTHOR_ALIASES, self.ebook_filename_template)
         return eb.load_from_database_json(everything[filename], filename), eb
 
     def open_db(self):
@@ -145,7 +148,7 @@ class Library(object):
                 eb.rename_from_metadata()
                 return eb
         if not is_already_in_db:
-            eb = Epub( full_path, LIBRARY_DIR, AUTHOR_ALIASES )
+            eb = Epub( full_path, LIBRARY_DIR, AUTHOR_ALIASES, self.ebook_filename_template )
             eb.open_metadata()
             eb.rename_from_metadata()
             print(" ->  NEW EBOOK: ", eb)
@@ -281,7 +284,7 @@ class Library(object):
                 continue
 
             # check for complete metadata
-            temp_ebook = Epub(ebook_candidate_full_path, LIBRARY_DIR, AUTHOR_ALIASES)
+            temp_ebook = Epub(ebook_candidate_full_path, LIBRARY_DIR, AUTHOR_ALIASES, self.ebook_filename_template)
             temp_ebook.open_metadata()
             if not temp_ebook.metadata.is_complete:
                 print(" -> skipping ebook with incomplete metadata: ",  ebook )

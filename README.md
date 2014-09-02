@@ -74,6 +74,7 @@ An example configuration would be:
         Richard Morgan: Richard K. Morgan
     backup_imported_ebooks: true
     interactive: true
+    ebook_filename_template: $a/$a ($y) $t
     kindle_documents_subdir: library
     kindle_root: /run/media/login/Kindle
     library_root: /home/login/ebooks
@@ -82,8 +83,15 @@ An example configuration would be:
         Harry Harrisson: Make Room! Make Room!
 
 *kindle_root* and *library_root* are mandatory. The rest is optional.
+
 *interactive* decides if importing ebooks is automatic or if manual confirmation
 is required for each book.
+
+*ebook_filename_template* is the template for epub filenames inside the library,
+by default '$a/$a ($y) $t'.
+Available information are: *$a* (author), *$y* (year), *$t* (title), *$s* (series),
+*$i* (series_index).
+
 The *wanted* option is to be seen as a way to keep a wishlist. Librarian.py will
 remove the entries it finds on import.
 
