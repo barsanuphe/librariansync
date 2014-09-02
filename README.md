@@ -105,6 +105,7 @@ Note: if python2 is the default version on your Linux distribution, launch with 
                         [-l [STRING [STRING ...]]] [-x STRING [STRING ...]]
                         [-t ADD_TAG [ADD_TAG ...]]
                         [-d DELETE_TAG [DELETE_TAG ...]] [-c [COLLECTIONS]]
+                        [--info [METADATA_FIELD [METADATA_FIELD ...]]]
 
     Librarian.
 
@@ -118,7 +119,7 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     -r, --refresh         refresh library
     -s, --scrape          scrape for ebooks
     -k, --sync-kindle     sync library (or a subset with --filter or --list)
-                          with kindle
+                            with kindle
 
     Tagging:
     Search and tag ebooks. For --list, --filter and --exclude, STRING can
@@ -136,6 +137,13 @@ Note: if python2 is the default version on your Linux distribution, launch with 
                             remove tag(s) from listed ebooks in library
     -c [COLLECTIONS], --collections [COLLECTIONS]
                             list all tags or ebooks with a given tag or "untagged"
+
+    Metadata:
+    Display and write epub metadata.
+
+    --info [METADATA_FIELD [METADATA_FIELD ...]]
+                            Display all or a selection of metadata tags for
+                            filtered ebooks.
 
 While syncing with Kindle, *librarian.py* will keep track of previous conversions
 to the mobi format (for epub ebooks), and of previously synced ebooks on the Kindle,
@@ -203,6 +211,10 @@ Sync to your Kindle all ebooks in the library with the tag *sf/space opera*, but
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
     python librarian.py -l tag:opera dumas -x hamilton -k
+
+Display the title and description for all of your Aldous Huxley ebooks:
+
+    python librarian.py -f author:huxley --info title description
 
 
 ## LibrarianSync

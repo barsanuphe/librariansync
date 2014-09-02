@@ -417,14 +417,19 @@ if __name__ == "__main__":
     group_tagging.add_argument('-d', '--delete-tag', dest='delete_tag', action='store', nargs="+", help='remove tag(s) from listed ebooks in library')
     group_tagging.add_argument('-c', '--collections', dest='collections', action='store', const="", nargs='?', help='list all tags or ebooks with a given tag or "untagged"')
 
+    group_tagging = parser.add_argument_group('Metadata', 'Display and write epub metadata.')
+    group_tagging.add_argument('--info', dest='info', action='store', metavar="METADATA_FIELD", nargs='*', help='Display all or a selection of metadata tags for filtered ebooks.')
+
     args = parser.parse_args()
 
     # a few checks on the arguments
     if not len(sys.argv) > 1:
         print("No option selected. Try -h.")
         sys.exit()
-    if args.filter_exclude is not None and args.filter_ebooks_and is None and args.filter_ebooks_or is None:
-        print("The exclude flag --exclude can only be used with either --list or --filter.")
+
+    is_not_filtered = (args.filter_ebooks_and is None and args.filter_ebooks_or is None)
+    if is_not_filtered and (args.filter_exclude is not None or args.info is not None) :
+        print("The --exclude/--info options can only be used with either --list or --filter.")
         sys.exit()
     if (args.add_tag is not None or args.delete_tag is not None) and (args.filter_ebooks_and is None or args.filter_ebooks_and == []) and (args.filter_ebooks_or is None or args.filter_ebooks_or == []) :
         print("Tagging all ebooks, or removing a tag from all ebooks, arguably makes no sense. Use the --list/--filter options to filter among the library.")
@@ -478,7 +483,12 @@ if __name__ == "__main__":
                         ebook.remove_from_collection(tag)
 
             for ebook in filtered:
-                print(" -> ", ebook)
+                if args.info is None:
+                    print(" -> ", ebook)
+                elif args.info == []:
+                    print(ebook.info())
+                else:
+                    print(ebook.info(args.info))
 
             if args.kindle:
                 if filtered == []:
