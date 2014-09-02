@@ -12,7 +12,6 @@
 #TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
 #TODO: try to query google books to get additionnal book info such as original publication date
 #TODO: when querying by series, order by series_index
-#TODO: solve exception for concurrent folder creation on refresh
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
@@ -145,12 +144,10 @@ class Library(object):
             if eb.path == full_path:
                 is_already_in_db = True
                 eb.open_metadata()
-                eb.rename_from_metadata()
                 return eb
         if not is_already_in_db:
             eb = Epub( full_path, LIBRARY_DIR, AUTHOR_ALIASES, self.ebook_filename_template )
             eb.open_metadata()
-            eb.rename_from_metadata()
             print(" ->  NEW EBOOK: ", eb)
             return eb
         return None
@@ -173,6 +170,10 @@ class Library(object):
                     print(" %.2f%%"%( 100*cpt/len(all_ebooks_in_library_dir)), end="\r", flush=True)
                     cpt += 1
                     self.ebooks.append( future.result() )
+
+        # not multithreaded to avoir concurrent folder creation
+        for eb in self.ebooks:
+            eb.rename_from_metadata()
 
         to_delete = [ eb for eb in old_db if eb not in self.ebooks]
         for eb in to_delete:

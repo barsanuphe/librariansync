@@ -91,6 +91,7 @@ is required for each book.
 by default '$a/$a ($y) $t'.
 Available information are: *$a* (author), *$y* (year), *$t* (title), *$s* (series),
 *$i* (series_index).
+Refreshing the database automatically applies the template.
 
 The *wanted* option is to be seen as a way to keep a wishlist. Librarian.py will
 remove the entries it finds on import.
