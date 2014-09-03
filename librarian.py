@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 #TODO: filename template: support for optional parts (ex: "[$s] [#$i]")
-#TODO: preview?
 #TODO: support for several series?
 #TODO: tags == dc:subject list?
 #TODO: return list when metadata has several elements of same type
@@ -12,6 +11,7 @@
 #TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
 #TODO: try to query google books to get additionnal book info such as original publication date
 #TODO: when querying by series, order by series_index
+#TODO: when displaying lists/info, json mode?
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile

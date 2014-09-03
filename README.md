@@ -51,7 +51,8 @@ Also, this is in very early stages. This means:
 
 - Python 3
 - Calibre (librarian.py relies on ebook-convert, which are part of Calibre)
-- pyyaml for python 3
+- pyyaml
+- python-lxml
 
 ### Configuration
 
