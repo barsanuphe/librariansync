@@ -155,11 +155,13 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     --info [METADATA_FIELD [METADATA_FIELD ...]]
                             Display all or a selection of metadata tags for
                             filtered ebooks.
+    --openlibrary           Search OpenLibrary for filtered ebooks.
 
     Configuration:
     Configuration options.
 
     --config CONFIG_FILE  Use an alternative configuration file.
+
 
 
 

@@ -20,6 +20,7 @@ import time, concurrent.futures, multiprocessing, json, argparse
 
 from librarianlib.epub import Epub
 from librarianlib.ebook_search import EbookSearch
+from librarianlib.openlibrary_search import OpenLibrarySearch
 
 if sys.version_info < (3,0,0):
   print("You need python 3.0 or later to run this script.")
@@ -426,6 +427,8 @@ if __name__ == "__main__":
 
     group_tagging = parser.add_argument_group('Metadata', 'Display and write epub metadata.')
     group_tagging.add_argument('--info', dest='info', action='store', metavar="METADATA_FIELD", nargs='*', help='Display all or a selection of metadata tags for filtered ebooks.')
+    group_tagging.add_argument('--openlibrary', dest='openlibrary', action='store_true', default = False, help='Search OpenLibrary for filtered ebooks.')
+
 
     group_tagging = parser.add_argument_group('Configuration', 'Configuration options.')
     group_tagging.add_argument('--config', dest='config', action='store', metavar="CONFIG_FILE", nargs=1, help='Use an alternative configuration file.')
@@ -506,6 +509,9 @@ if __name__ == "__main__":
             for ebook in filtered:
                 if args.info is None:
                     print(" -> ", ebook)
+                    if args.openlibrary:
+                        s = OpenLibrarySearch()
+                        s.search(ebook)
                 elif args.info == []:
                     print(ebook.info())
                 else:
