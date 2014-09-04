@@ -5,7 +5,6 @@
 #TODO: support for several series?
 #TODO: tags == dc:subject list?
 #TODO: return list when metadata has several elements of same type
-#TODO: --write-metadata to epub
 #TODO: auto-correct option (w/author_aliases) + yaml option confirm_before_write
 #TODO: extract from tags the property "was read"
 #TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
