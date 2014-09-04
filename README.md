@@ -116,6 +116,8 @@ Note: if python2 is the default version on your Linux distribution, launch with 
                         [-t ADD_TAG [ADD_TAG ...]]
                         [-d DELETE_TAG [DELETE_TAG ...]] [-c [COLLECTIONS]]
                         [--info [METADATA_FIELD [METADATA_FIELD ...]]]
+                        [--openlibrary]
+                        [--write-metadata METADATA_FIELD_AND_VALUE [METADATA_FIELD_AND_VALUE ...]]
                         [--config CONFIG_FILE]
 
     Librarian. A very early version of it.
@@ -155,14 +157,14 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     --info [METADATA_FIELD [METADATA_FIELD ...]]
                             Display all or a selection of metadata tags for
                             filtered ebooks.
-    --openlibrary           Search OpenLibrary for filtered ebooks.
+    --openlibrary         Search OpenLibrary for filtered ebooks.
+    --write-metadata METADATA_FIELD_AND_VALUE [METADATA_FIELD_AND_VALUE ...]
+                            Write one or several field:value metadata.
 
     Configuration:
     Configuration options.
 
     --config CONFIG_FILE  Use an alternative configuration file.
-
-
 
 
 While syncing with Kindle, *librarian.py* will keep track of previous conversions
@@ -173,6 +175,8 @@ and will try to work no more than necessary.
 and *remove from the Kindle all previously existing mobis not presently filtered*.
 Do make sure the *kindle_documents_subdir* of the configuration file only contains
 ebooks that are inside the library.
+
+**Writing metadata is very, very experimental.**
 
 Note that if books are imported successfully, a refresh is automatically added.
 Also, only .epubs and .mobis are imported/scraped, with a preference for .epub

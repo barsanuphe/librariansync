@@ -428,6 +428,7 @@ if __name__ == "__main__":
     group_tagging = parser.add_argument_group('Metadata', 'Display and write epub metadata.')
     group_tagging.add_argument('--info', dest='info', action='store', metavar="METADATA_FIELD", nargs='*', help='Display all or a selection of metadata tags for filtered ebooks.')
     group_tagging.add_argument('--openlibrary', dest='openlibrary', action='store_true', default = False, help='Search OpenLibrary for filtered ebooks.')
+    group_tagging.add_argument('--write-metadata', dest='write_metadata', action='store', metavar="METADATA_FIELD_AND_VALUE", nargs='+', help='Write one or several field:value metadata.')
 
 
     group_tagging = parser.add_argument_group('Configuration', 'Configuration options.')
@@ -506,16 +507,23 @@ if __name__ == "__main__":
                     for tag in args.delete_tag:
                         ebook.remove_from_collection(tag)
 
+
+
             for ebook in filtered:
                 if args.info is None:
                     print(" -> ", ebook)
                     if args.openlibrary:
                         s = OpenLibrarySearch()
                         s.search(ebook)
-                elif args.info == []:
-                    print(ebook.info())
                 else:
-                    print(ebook.info(args.info))
+                    if args.info == []:
+                        print(ebook.info())
+                    else:
+                        print(ebook.info(args.info))
+
+                if args.write_metadata is not None:
+                    ebook.update_metadata(args.write_metadata)
+
 
             if args.kindle:
                 if filtered == []:
