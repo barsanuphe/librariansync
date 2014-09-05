@@ -7,10 +7,9 @@
 #TODO: return list when metadata has several elements of same type
 #TODO: auto-correct option (w/author_aliases) + yaml option confirm_before_write
 #TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
-#TODO: try to query google books to get additionnal book info such as original publication date
+#TODO: try to query google books too
 #TODO: when querying by series, order by series_index
 #TODO: when displaying lists/info, json mode?
-#TODO: epub: @has_changed decorator
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
@@ -95,7 +94,7 @@ class Library(object):
                 KINDLE_ROOT = self.config["kindle_root"]
                 LIBRARY_ROOT = self.config["library_root"]
 
-                if "kindle_documents_subdir" in list(self.config.keys()):
+                if "kindle_documents_subdir" in self.config.keys():
                     KINDLE_DOCUMENTS_SUBDIR = self.config["kindle_documents_subdir"] #TODO check if valid name
 
                 refresh_global_variables()
@@ -103,15 +102,15 @@ class Library(object):
                 print("Missing config option: ", err)
                 raise Exception("Invalid configuration file!")
 
-            if "scrape_root" in list(self.config.keys()):
+            if "scrape_root" in self.config.keys():
                 self.scrape_root = self.config["scrape_root"]
-            if "backup_imported_ebooks" in list(self.config.keys()):
+            if "backup_imported_ebooks" in self.config.keys():
                 self.backup_imported_ebooks = self.config["backup_imported_ebooks"]
-            if "author_aliases" in list(self.config.keys()):
+            if "author_aliases" in self.config.keys():
                 AUTHOR_ALIASES = self.config["author_aliases"]
-            if "wanted" in list(self.config.keys()):
+            if "wanted" in self.config.keys():
                 self.wanted = self.config["wanted"]
-            if "interactive" in list(self.config.keys()):
+            if "interactive" in self.config.keys():
                 self.interactive = self.config["interactive"]
             self.ebook_filename_template = self.config.get("ebook_filename_template", "$a/$a ($y) $t")
 
@@ -119,7 +118,7 @@ class Library(object):
         yaml.dump(self.config, open(LIBRARY_CONFIG, 'w'), indent=4, default_flow_style=False, allow_unicode=True)
 
     def _load_ebook(self, everything, filename):
-        if not "path" in list(everything[filename].keys()):
+        if not "path" in everything[filename].keys():
             return False, None
         eb = Epub(everything[filename]["path"], LIBRARY_DIR, AUTHOR_ALIASES, self.ebook_filename_template)
         return eb.load_from_database_json(everything[filename], filename), eb
@@ -131,7 +130,7 @@ class Library(object):
             everything = json.load(open(LIBRARY_DB, 'r'))
 
             with concurrent.futures.ThreadPoolExecutor(max_workers = multiprocessing.cpu_count()) as executor:
-                future_to_ebook = { executor.submit(self._load_ebook, everything, filename): filename for filename in list(everything.keys())}
+                future_to_ebook = { executor.submit(self._load_ebook, everything, filename): filename for filename in everything.keys()}
                 for future in concurrent.futures.as_completed(future_to_ebook):
                     success, ebook = future.result()
                     if success:
@@ -188,7 +187,7 @@ class Library(object):
 
         if self.wanted != {}:
             for ebook in self.ebooks:
-                if ebook.metadata.author in list(self.wanted.keys()) and self.wanted[ebook.metadata.author] in ebook.metadata.title:
+                if ebook.metadata.author in self.wanted.keys() and self.wanted[ebook.metadata.author] in ebook.metadata.title:
                     print("! Found WANTED ebook: %s - %s "%(ebook.author,self.wanted[ebook.metadata.author]) )
                     answer = input("! Confirm this is what you were looking for: %s\ny/n? "%ebook)
                     if answer.lower() == "y":
@@ -489,7 +488,7 @@ if __name__ == "__main__":
             if args.collections is not None:
                 if args.collections == "":
                     all_tags = s.list_tags()
-                    for tag in sorted(list(all_tags.keys())):
+                    for tag in sorted(all_tags.keys()):
                         print(" -> %s (%s)"%(tag, all_tags[tag]))
                 elif args.collections == "untagged":
                     filtered = s.search([""], ["tag:"], additive = False)
