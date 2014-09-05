@@ -17,9 +17,11 @@ import os, subprocess, shutil, sys, hashlib, zipfile
 import xml.dom.minidom, codecs
 import time, concurrent.futures, multiprocessing, json, argparse
 
-from librarianlib.epub import Epub
+from librarianlib.epub import Epub, read, not_read, reading
 from librarianlib.ebook_search import EbookSearch
 from librarianlib.openlibrary_search import OpenLibrarySearch
+
+
 
 if sys.version_info < (3,0,0):
   print("You need python 3.0 or later to run this script.")
@@ -509,6 +511,7 @@ if __name__ == "__main__":
                     for tag in args.delete_tag:
                         ebook.remove_from_collection(tag)
 
+            #print('(', read("read"), not_read("not_read"), reading("reading"), ')')
             for ebook in filtered:
 
                 if args.info is None:

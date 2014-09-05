@@ -53,6 +53,7 @@ Also, this is in very early stages. This means:
 - Calibre (librarian.py relies on ebook-convert, which are part of Calibre)
 - pyyaml
 - python-lxml
+- python-colorama (optional)
 
 ### Configuration
 
