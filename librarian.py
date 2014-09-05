@@ -6,11 +6,11 @@
 #TODO: tags == dc:subject list?
 #TODO: return list when metadata has several elements of same type
 #TODO: auto-correct option (w/author_aliases) + yaml option confirm_before_write
-#TODO: extract from tags the property "was read"
 #TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
 #TODO: try to query google books to get additionnal book info such as original publication date
 #TODO: when querying by series, order by series_index
 #TODO: when displaying lists/info, json mode?
+#TODO: epub: @has_changed decorator
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
@@ -411,23 +411,26 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Librarian. A very early version of it.')
 
     group_import_export = parser.add_argument_group('Library management', 'Import, analyze, and sync with Kindle.')
-    group_import_export.add_argument('-i', '--import', dest='import_ebooks', action='store_true', default = False, help='import ebooks')
-    group_import_export.add_argument('-r', '--refresh', dest='refresh', action='store_true', default = False, help='refresh library')
-    group_import_export.add_argument('-s', '--scrape', dest='scrape', action='store_true', default = False, help='scrape for ebooks')
-    group_import_export.add_argument('-k', '--sync-kindle', dest='kindle', action='store_true', default = False, help='sync library (or a subset with --filter or --list) with kindle')
+    group_import_export.add_argument('-i', '--import',      dest='import_ebooks',   action='store_true', default = False, help='import ebooks')
+    group_import_export.add_argument('-r', '--refresh',     dest='refresh',         action='store_true', default = False, help='refresh library')
+    group_import_export.add_argument('-s', '--scrape',      dest='scrape',          action='store_true', default = False, help='scrape for ebooks')
+    group_import_export.add_argument('-k', '--sync-kindle', dest='kindle',          action='store_true', default = False, help='sync library (or a subset with --filter or --list) with kindle')
 
-    group_tagging = parser.add_argument_group('Tagging', 'Search and tag ebooks. For --list, --filter and --exclude, STRING can begin with author:, title:, tag:, or series: for a more precise search.')
-    group_tagging.add_argument('-f', '--filter', dest='filter_ebooks_and', action='store', nargs="*", metavar="STRING", help='list ebooks in library matching ALL patterns')
-    group_tagging.add_argument('-l', '--list', dest='filter_ebooks_or', action='store', nargs="*", metavar="STRING", help='list ebooks in library matching ANY pattern')
-    group_tagging.add_argument('-x', '--exclude', dest='filter_exclude', action='store', nargs="+", metavar="STRING", help='exclude ALL STRINGS from current list/filter')
-    group_tagging.add_argument('-t', '--add-tag', dest='add_tag', action='store', nargs="+", help='tag listed ebooks in library')
-    group_tagging.add_argument('-d', '--delete-tag', dest='delete_tag', action='store', nargs="+", help='remove tag(s) from listed ebooks in library')
-    group_tagging.add_argument('-c', '--collections', dest='collections', action='store', const="", nargs='?', help='list all tags or ebooks with a given tag or "untagged"')
+    group_tagging = parser.add_argument_group('Tagging', 'Search and tag ebooks. For --list, --filter and --exclude, \
+                                              STRING can begin with author:, title:, tag:, series: or progress: for a more precise search.')
+    group_tagging.add_argument('-f', '--filter',        dest='filter_ebooks_and',   action='store', nargs="*", metavar="STRING",                help='list ebooks in library matching ALL patterns')
+    group_tagging.add_argument('-l', '--list',          dest='filter_ebooks_or',    action='store', nargs="*", metavar="STRING",                help='list ebooks in library matching ANY pattern')
+    group_tagging.add_argument('-x', '--exclude',       dest='filter_exclude',      action='store', nargs="+", metavar="STRING",                help='exclude ALL STRINGS from current list/filter')
+    group_tagging.add_argument('-t', '--add-tag',       dest='add_tag',             action='store', nargs="+", metavar="TAG",                   help='tag listed ebooks in library')
+    group_tagging.add_argument('-d', '--delete-tag',    dest='delete_tag',          action='store', nargs="+", metavar="TAG",                   help='remove tag(s) from listed ebooks in library')
+    group_tagging.add_argument('-c', '--collections',   dest='collections',         action='store', nargs='?', metavar="COLLECTION", const="",  help='list all tags or ebooks with a given tag or "untagged"')
+    group_tagging.add_argument(      '--progress',      dest='read',                choices = ['read', 'reading', 'not_read'],                  help='Set filtered ebooks as read.')
+
 
     group_tagging = parser.add_argument_group('Metadata', 'Display and write epub metadata.')
-    group_tagging.add_argument('--info', dest='info', action='store', metavar="METADATA_FIELD", nargs='*', help='Display all or a selection of metadata tags for filtered ebooks.')
-    group_tagging.add_argument('--openlibrary', dest='openlibrary', action='store_true', default = False, help='Search OpenLibrary for filtered ebooks.')
-    group_tagging.add_argument('--write-metadata', dest='write_metadata', action='store', metavar="METADATA_FIELD_AND_VALUE", nargs='+', help='Write one or several field:value metadata.')
+    group_tagging.add_argument('--info',            dest='info',            action='store',       metavar="METADATA_FIELD",           nargs='*',  help='Display all or a selection of metadata tags for filtered ebooks.')
+    group_tagging.add_argument('--openlibrary',     dest='openlibrary',     action='store_true',  default = False,                                help='Search OpenLibrary for filtered ebooks.')
+    group_tagging.add_argument('--write-metadata',  dest='write_metadata',  action='store',       metavar="METADATA_FIELD_AND_VALUE", nargs='+',  help='Write one or several field:value metadata.')
 
 
     group_tagging = parser.add_argument_group('Configuration', 'Configuration options.')
@@ -506,9 +509,8 @@ if __name__ == "__main__":
                     for tag in args.delete_tag:
                         ebook.remove_from_collection(tag)
 
-
-
             for ebook in filtered:
+
                 if args.info is None:
                     print(" -> ", ebook)
                     if args.openlibrary:
@@ -522,6 +524,9 @@ if __name__ == "__main__":
 
                 if args.write_metadata is not None:
                     ebook.update_metadata(args.write_metadata)
+
+                if args.read is not None:
+                    ebook.set_progress(args.read)
 
 
             if args.kindle:

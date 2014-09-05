@@ -113,8 +113,8 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     $ python librarian.py -h
     usage: librarian.py [-h] [-i] [-r] [-s] [-k] [-f [STRING [STRING ...]]]
                         [-l [STRING [STRING ...]]] [-x STRING [STRING ...]]
-                        [-t ADD_TAG [ADD_TAG ...]]
-                        [-d DELETE_TAG [DELETE_TAG ...]] [-c [COLLECTIONS]]
+                        [-t TAG [TAG ...]] [-d TAG [TAG ...]] [-c [COLLECTION]]
+                        [--progress {read,reading,not_read}]
                         [--info [METADATA_FIELD [METADATA_FIELD ...]]]
                         [--openlibrary]
                         [--write-metadata METADATA_FIELD_AND_VALUE [METADATA_FIELD_AND_VALUE ...]]
@@ -136,7 +136,8 @@ Note: if python2 is the default version on your Linux distribution, launch with 
 
     Tagging:
     Search and tag ebooks. For --list, --filter and --exclude, STRING can
-    begin with author:, title:, tag:, or series: for a more precise search.
+    begin with author:, title:, tag:, series: or progress: for a more precise
+    search.
 
     -f [STRING [STRING ...]], --filter [STRING [STRING ...]]
                             list ebooks in library matching ALL patterns
@@ -144,12 +145,14 @@ Note: if python2 is the default version on your Linux distribution, launch with 
                             list ebooks in library matching ANY pattern
     -x STRING [STRING ...], --exclude STRING [STRING ...]
                             exclude ALL STRINGS from current list/filter
-    -t ADD_TAG [ADD_TAG ...], --add-tag ADD_TAG [ADD_TAG ...]
+    -t TAG [TAG ...], --add-tag TAG [TAG ...]
                             tag listed ebooks in library
-    -d DELETE_TAG [DELETE_TAG ...], --delete-tag DELETE_TAG [DELETE_TAG ...]
+    -d TAG [TAG ...], --delete-tag TAG [TAG ...]
                             remove tag(s) from listed ebooks in library
-    -c [COLLECTIONS], --collections [COLLECTIONS]
+    -c [COLLECTION], --collections [COLLECTION]
                             list all tags or ebooks with a given tag or "untagged"
+    --progress {read,reading,not_read}
+                            Set filtered ebooks as read.
 
     Metadata:
     Display and write epub metadata.
