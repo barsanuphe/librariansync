@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import subprocess, json, os, uuid, time, sys, shutil, locale
+import subprocess, json, os, uuid, time, sys, shutil, locale, codecs
 import sqlite3, requests
 from collections import defaultdict
 
@@ -8,6 +8,7 @@ from collections import defaultdict
 KINDLE_DB_PATH = "/var/local/cc.db"
 TAGS = "../collections.json"
 CALIBRE_PLUGIN_FILE = "../calibre_plugin.json"
+EXPORT = "../exported_collections.json"
 KINDLE_EBOOKS_ROOT = "/mnt/us/documents/"
 
 SELECT_COLLECTION_ENTRIES =     'select p_uuid, p_titles_0_nominal          from Entries where p_type = "Collection"'
@@ -32,7 +33,7 @@ def parse_entries(cursor):
 
     return ebooks, collections
 
-def parse_existing_collections():
+def parse_existing_collections(c):
     existing_collections = defaultdict(list)
 
     c.execute(SELECT_EXISTING_COLLECTIONS)
@@ -55,7 +56,10 @@ def parse_calibre_plugin_config(config_file):
 
 #-------- Folders
 def get_relative_path(path):
-    return path.split(KINDLE_EBOOKS_ROOT)[1].decode("utf8")
+    if isinstance(path, str):
+        return path.split(KINDLE_EBOOKS_ROOT)[1].decode("utf8")
+    else:
+        return path.split(KINDLE_EBOOKS_ROOT)[1]
 
 def list_folder_contents():
     folder_contents = {}
@@ -255,6 +259,34 @@ def update_cc_db_from_calibre_plugin_json(complete_rebuild = True):
 
     actually_update_db(commands, collections_dict)
 
+def export_existing_collections():
+    cc_db = sqlite3.connect(KINDLE_DB_PATH)
+    c = cc_db.cursor()
+    # build dictionaries of ebooks/collections with their uuids
+    db_ebooks, db_collections = parse_entries(c)
+    # dict [ebook_location] = ebook_uuid
+    # dict [collection_label] = collection_uuid
+
+    # dict [ebook_uuid] = ebook_location
+    inverted_db_ebooks = {v: k for k, v in db_ebooks.iteritems()}
+    # dict [collection_uuid] = collection_label
+    inverted_db_collections = {v: k for k, v in db_collections.iteritems()}
+
+    # dict [collection uuid] = [ ebook uuids, ]
+    collections_dict = parse_existing_collections(c)
+    labels_collections_dict = defaultdict(list) # dict [collection_label] = [ebook locations, ]
+    for collection_uuid in collections_dict.keys():
+        if collection_uuid in inverted_db_collections.keys():
+            labels_collections_dict[inverted_db_collections[collection_uuid]].extend([inverted_db_ebooks[ebook_uuid] for ebook_uuid in collections_dict[collection_uuid] if ebook_uuid in inverted_db_ebooks.keys()])
+
+    export = defaultdict(list) # dict [ebook_location] = [ collection_label ]
+    for collection_label, ebook_location_list in labels_collections_dict.items():
+        for ebook_location in ebook_location_list:
+            export[get_relative_path(ebook_location)].append(collection_label)
+
+    export_json = codecs.open(EXPORT, "w", "utf8")
+    export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
+    export_json.close()
 
 if __name__ == "__main__":
     command = sys.argv[1]
@@ -266,3 +298,5 @@ if __name__ == "__main__":
         update_cc_db(complete_rebuild = True, from_json = False)
     elif command == "rebuild_from_calibre_plugin_json":
         update_cc_db_from_calibre_plugin_json(complete_rebuild = True)
+    elif command == "export":
+        export_existing_collections()

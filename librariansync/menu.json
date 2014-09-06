@@ -31,6 +31,13 @@
                     "exitmenu": false,
                     "status": false,
                     "action": "python generate_collections.py rebuild_from_calibre_plugin_json"
+                },
+                {
+                    "name": "Export current collections",
+                    "priority": -1,
+                    "exitmenu": false,
+                    "status": false,
+                    "action": "python generate_collections.py export"
                 }
             ]
         }
