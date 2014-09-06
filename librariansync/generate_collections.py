@@ -2,6 +2,7 @@
 
 import subprocess, json, os, uuid, time, sys, shutil, locale
 import sqlite3, requests
+from collections import defaultdict
 
 #-------- Config
 KINDLE_DB_PATH = "/var/local/cc.db"
@@ -31,14 +32,11 @@ def parse_entries(cursor):
     return ebooks, collections
 
 def parse_existing_collections():
-    existing_collections = {}
+    existing_collections = defaultdict(list)
 
     c.execute(SELECT_EXISTING_COLLECTIONS)
     for (collection_uuid, ebook_uuid) in c.fetchall():
-        if collection_uuid in existing_collections.keys():
-            existing_collections[collection_uuid].append(ebook_uuid)
-        else:
-            existing_collections[collection_uuid] = [ebook_uuid]
+        existing_collections[collection_uuid].append(ebook_uuid)
 
     return existing_collections
 
@@ -187,14 +185,12 @@ def update_kindle_db(cursor, db_ebooks, db_collections, config_tags, complete_re
 
     # update all Item:Ebook entries that are in at least one Collection,
     # with the number of collections it belongs to.
-    ebook_dict = {} # { uuid: number_of_collections }
+    ebook_dict = defaultdict(lambda: 0) # { uuid: number_of_collections }
     for coll in collections_dict.keys():
         ebook_uuids = collections_dict[coll]
         for ebook_uuid in ebook_uuids:
-            if ebook_uuid in ebook_dict.keys():
-                ebook_dict[ebook_uuid] += 1
-            else:
-                ebook_dict[ebook_uuid] = 1
+            ebook_dict[ebook_uuid] += 1
+
     for ebook in ebook_dict.keys():
         commands.append( update_ebook_entry_if_in_collection(ebook, ebook_dict[ebook]) )
 
