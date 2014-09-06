@@ -2,7 +2,7 @@
 
 HACKNAME="librariansync"
 PKGNAME="${HACKNAME}"
-PKGVER="1.0"
+PKGVER="1.1"
 DEVICE="pw2"
 
 # check for kindletool
@@ -18,6 +18,12 @@ tar -zcvf librariansync.tar.gz librariansync/generate_collections.py librariansy
 # build the update
 kindletool create ota2 -d ${DEVICE} librariansync.tar.gz install.sh Update_${PKGNAME}_${PKGVER}_${DEVICE}.bin
 
+# create release archive
+cp librariansync/README.md .
+tar -zcvf librariansync-${PKGVER}.tar.gz Update_${PKGNAME}_${PKGVER}_${DEVICE}.bin README.md
+
 # cleanup
+rm README.md
 rm -R librariansync
 rm librariansync.tar.gz
+rm Update_${PKGNAME}_${PKGVER}_${DEVICE}.bin

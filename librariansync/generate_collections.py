@@ -7,6 +7,7 @@ from collections import defaultdict
 #-------- Config
 KINDLE_DB_PATH = "/var/local/cc.db"
 TAGS = "../collections.json"
+CALIBRE_PLUGIN_FILE = "../calibre_plugin.json"
 KINDLE_EBOOKS_ROOT = "/mnt/us/documents/"
 
 SELECT_COLLECTION_ENTRIES =     'select p_uuid, p_titles_0_nominal          from Entries where p_type = "Collection"'
@@ -43,6 +44,14 @@ def parse_existing_collections():
 #-------- JSON collections
 def parse_config(config_file):
     return json.load(open(config_file, 'r'), 'utf8')
+
+def parse_calibre_plugin_config(config_file):
+    calibre_plugin_config = json.load(open(config_file, 'r'), 'utf8')
+    collection_names = [el.split("@")[0] for el in calibre_plugin_config.keys()]
+    collection_members_uuid = defaultdict(list) # collection_label: [ebook_uuid, ...]
+    for collection in calibre_plugin_config.keys():
+        collection_members_uuid[collection.split("@")[0]].extend( calibre_plugin_config[collection]["items"])
+    return collection_members_uuid
 
 #-------- Folders
 def get_relative_path(path):
@@ -116,6 +125,26 @@ def send_post_commands(command):
     #print r.json()
 
 #-------- Kindle database update
+def actually_update_db(commands, collections_dict):
+
+    # update all 'Collections' entries with new members
+    for coll in collections_dict.keys():
+        commands.append(update_collections_entry(coll, collections_dict[coll]) )
+
+    # update all Item:Ebook entries that are in at least one Collection,
+    # with the number of collections it belongs to.
+    ebook_dict = defaultdict(lambda: 0) # { uuid: number_of_collections }
+    for coll in collections_dict.keys():
+        ebook_uuids = collections_dict[coll]
+        for ebook_uuid in ebook_uuids:
+            ebook_dict[ebook_uuid] += 1
+
+    for ebook in ebook_dict.keys():
+        commands.append( update_ebook_entry_if_in_collection(ebook, ebook_dict[ebook]) )
+
+    # send all the commands to update the database
+    send_post_commands(commands)
+
 def update_kindle_db(cursor, db_ebooks, db_collections, config_tags, complete_rebuild = True):
     commands = []
     if complete_rebuild:
@@ -179,23 +208,7 @@ def update_kindle_db(cursor, db_ebooks, db_collections, config_tags, complete_re
                         else:
                             collections_dict[db_collections[subcollection]] = [subcollection_to_collection_uuid]
 
-    # update all 'Collections' entries with new members
-    for coll in collections_dict.keys():
-        commands.append(update_collections_entry(coll, collections_dict[coll]) )
-
-    # update all Item:Ebook entries that are in at least one Collection,
-    # with the number of collections it belongs to.
-    ebook_dict = defaultdict(lambda: 0) # { uuid: number_of_collections }
-    for coll in collections_dict.keys():
-        ebook_uuids = collections_dict[coll]
-        for ebook_uuid in ebook_uuids:
-            ebook_dict[ebook_uuid] += 1
-
-    for ebook in ebook_dict.keys():
-        commands.append( update_ebook_entry_if_in_collection(ebook, ebook_dict[ebook]) )
-
-    # send all the commands to update the database
-    send_post_commands(commands)
+    actually_update_db(commands, collections_dict)
 
 #-------- Main
 def update_cc_db(complete_rebuild = True, from_json = True):
@@ -212,6 +225,37 @@ def update_cc_db(complete_rebuild = True, from_json = True):
     # update kindle db accordingly
     update_kindle_db(c, db_ebooks, db_collections, collections_contents, complete_rebuild)
 
+def update_cc_db_from_calibre_plugin_json(complete_rebuild = True):
+    cc_db = sqlite3.connect(KINDLE_DB_PATH)
+    c = cc_db.cursor()
+    # build dictionaries of ebooks/collections with their uuids
+    db_ebooks, db_collections = parse_entries(c)
+    # parse calibre plugin json
+    collection_members_uuid = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
+
+    commands = []
+    if complete_rebuild:
+        # remove all previous collections
+        for coll_uuid in db_collections.values():
+            commands.append( delete_collection_json(coll_uuid) )
+        db_collections = {} # raz
+
+    collections_dict = defaultdict(list) # dict [collection uuid] = [ ebook uuids, ]
+
+    for collection_label in collection_members_uuid.keys():
+        if collection_label not in db_collections.keys():
+            # create
+            new_uuid = uuid.uuid4()
+            timestamp = int(time.time())
+            #insert new collection dans Entries
+            commands.append( insert_new_collection_entry(new_uuid, collection_label, timestamp) )
+            collections_dict[new_uuid].extend(collection_members_uuid[collection_label])
+        else:
+            collections_dict[db_collections[collection_label]].extend(collection_members_uuid[collection_label])
+
+    actually_update_db(commands, collections_dict)
+
+
 if __name__ == "__main__":
     command = sys.argv[1]
     if command == "add":
@@ -220,3 +264,5 @@ if __name__ == "__main__":
         update_cc_db(complete_rebuild = True, from_json = True)
     elif command == "rebuild_from_folders":
         update_cc_db(complete_rebuild = True, from_json = False)
+    elif command == "rebuild_from_calibre_plugin_json":
+        update_cc_db_from_calibre_plugin_json(complete_rebuild = True)

@@ -248,8 +248,8 @@ Display the title and description for all of your Aldous Huxley ebooks:
 ## LibrarianSync
 
 This is the part that generates the Kindle collections from a json file.
-It can be used completely independantly of librarian.py, provided the
-collections.json file is correct (see example later) and in the correct location
+It can be used completely independently of librarian.py, provided the
+json file is correct (see example later) and in the correct location
 (inside the **extensions** folder on the Kindle).
 
 ### Requirements
@@ -282,13 +282,16 @@ This .bin package is then installable through the Kindle interface.
 From the Kindle, launch KUAL. A new menu option *Librarian Sync* should appear,
 which contains two entries:
 
-- *Rebuild all collections (from json)* :
+- *Rebuild collections (from json)* :
     to clear all existing collections and rebuild them using the json file
 - *Add to collections (from json)* :
     to only add ebooks to existing or new collections, using the json file
-- *Rebuild all collections (from folders)* :
+- *Rebuild collections (from folders)* :
     to clear all existing collections and rebuild them using the folder structure
     inside the **documents** folder.
+- *Rebuild collections (from calibre plugin json)* :
+    to clear all existing collections and rebuild them using a json file generated
+    by the Calibre Kindle collections plugin
 
 ### What it does
 
@@ -296,7 +299,7 @@ After syncing with the main script librarian.py, and if tags are defined in
 library.yaml for entries, the **extensions** folder on the Kindle should contain
 a file, collections.json.
 
-When *rebuilding collections*, Librarian Sync removes all collections, then adds
+When *rebuilding collections*, LibrarianSync removes all collections, then adds
 the collections as defined in collections.json.
 
 When *adding to them*, it preserves already existing collections, and only either
@@ -306,6 +309,10 @@ When *rebuilding collection from folders*, it removes all collections and
 recursively scans for any supported file inside the **documents** folder.
 Subfolders will be treated as different collections.
 Ebooks directly in the **documents** folder are ignored.
+
+When *rebuilding collections from Calibre Kindle plugin json*, LibrarianSync
+removes all collections, then adds the collections as defined in a
+calibre_plugin.json in the **extensions** folder.
 
 Allow for a few seconds for the Kindle database and interface to reflect the
 changes made.

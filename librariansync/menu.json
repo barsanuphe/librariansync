@@ -5,7 +5,7 @@
             "priority": -1,
             "items": [
                 {
-                    "name": "Rebuild all collections (from json)",
+                    "name": "Rebuild collections (from json)",
                     "priority": -1,
                     "exitmenu": false,
                     "status": false,
@@ -19,11 +19,18 @@
                     "action": "python generate_collections.py add"
                 },
                 {
-                    "name": "Rebuild all collections (from folders)",
+                    "name": "Rebuild collections (from folders)",
                     "priority": -1,
                     "exitmenu": false,
                     "status": false,
                     "action": "python generate_collections.py rebuild_from_folders"
+                },
+                {
+                    "name": "Rebuild collections (from calibre plugin json)",
+                    "priority": -1,
+                    "exitmenu": false,
+                    "status": false,
+                    "action": "python generate_collections.py rebuild_from_calibre_plugin_json"
                 }
             ]
         }
