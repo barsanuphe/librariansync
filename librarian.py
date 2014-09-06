@@ -4,12 +4,12 @@
 #TODO: filename template: support for optional parts (ex: "[$s] [#$i]")
 #TODO: support for several series?
 #TODO: tags == dc:subject list?
-#TODO: return list when metadata has several elements of same type
 #TODO: auto-correct option (w/author_aliases) + yaml option confirm_before_write
 #TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
 #TODO: try to query google books too
 #TODO: when querying by series, order by series_index
 #TODO: when displaying lists/info, json mode?
+#TODO: wanted list support for multiple books for each author
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
@@ -17,7 +17,7 @@ import xml.dom.minidom, codecs
 import time, concurrent.futures, multiprocessing, json, argparse
 
 from librarianlib.epub import Epub, read, not_read, reading
-from librarianlib.ebook_search import EbookSearch
+from librarianlib.ebook_search import EbookSearch, fuzzy_search_in_list
 from librarianlib.openlibrary_search import OpenLibrarySearch
 
 
@@ -185,15 +185,17 @@ class Library(object):
             for dir in [os.path.join(root, el) for el in dirs if os.listdir( os.path.join(root, el)) == []]:
                 os.rmdir(dir)
 
+        # check if imported ebook was on wishlist
         if self.wanted != {}:
             for ebook in self.ebooks:
-                if ebook.metadata.author in self.wanted.keys() and self.wanted[ebook.metadata.author] in ebook.metadata.title:
-                    print("! Found WANTED ebook: %s - %s "%(ebook.author,self.wanted[ebook.metadata.author]) )
-                    answer = input("! Confirm this is what you were looking for: %s\ny/n? "%ebook)
-                    if answer.lower() == "y":
-                        print(" -> Removing from wanted list.")
-                        del self.wanted[ebook.metadata.author]
-                        self.save_config()
+                for key in self.wanted.keys():
+                    if fuzzy_search_in_list(key, ebook.metadata.get_values("author")) and fuzzy_search_in_list(self.wanted[key], ebook.metadata.get_values("title")):
+                        print("! Found WANTED ebook: ", ebook )
+                        answer = input("! Confirm this is what you were looking for: %s\ny/n? "%ebook)
+                        if answer.lower() == "y":
+                            print(" -> Removing from wanted list.")
+                            del self.wanted[key]
+                            self.save_config()
 
         is_incomplete = self.list_incomplete_metadata()
         print("Database refreshed in %.2fs."%(time.perf_counter() - start))
