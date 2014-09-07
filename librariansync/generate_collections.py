@@ -16,9 +16,9 @@ CALIBRE_PLUGIN_FILE =   "/mnt/us/system/collections.json"
 EXPORT =                "../exported_collections.json"
 KINDLE_EBOOKS_ROOT =    "/mnt/us/documents/"
 
-SELECT_COLLECTION_ENTRIES =    'select p_uuid, p_titles_0_nominal          from Entries where p_type = "Collection"'
-SELECT_EBOOK_ENTRIES =         'select p_uuid, p_location, p_cdeKey        from Entries where p_type = "Entry:Item"'
-SELECT_EXISTING_COLLECTIONS =  'select i_collection_uuid, i_member_uuid    from Collections'
+SELECT_COLLECTION_ENTRIES =    'select p_uuid, p_titles_0_nominal                     from Entries where p_type = "Collection"'
+SELECT_EBOOK_ENTRIES =         'select p_uuid, p_location, p_cdeKey, p_cdeType        from Entries where p_type = "Entry:Item"'
+SELECT_EXISTING_COLLECTIONS =  'select i_collection_uuid, i_member_uuid               from Collections'
 
 #-------- Existing Kindle database entries
 def parse_entries(cursor):
@@ -30,10 +30,10 @@ def parse_entries(cursor):
         db_collections.append(Collection(uuid, label))
 
     cursor.execute(SELECT_EBOOK_ENTRIES)
-    for (uuid, location, cdekey) in cursor.fetchall():
+    for (uuid, location, cdekey, cdetype) in cursor.fetchall():
         # only consider user ebooks
         if location is not None and KINDLE_EBOOKS_ROOT in location:
-            db_ebooks.append(Ebook(uuid, location, cdekey))
+            db_ebooks.append(Ebook(uuid, location, cdekey, cdetype))
 
     cursor.execute(SELECT_EXISTING_COLLECTIONS)
     for (collection_uuid, ebook_uuid) in cursor.fetchall():
@@ -87,16 +87,15 @@ def update_lists_from_librarian_json(db_ebooks, db_collections, collection_conte
 
     return db_ebooks, db_collections
 
-# Return a cdeType, cdeKey couple from a legacy json hash
+# Return a cdeKey, cdeType couple from a legacy json hash
 def parse_legacy_hash(legacy_hash):
     if legacy_hash.startswith('#'):
-        cdeKey, cdeType = legacy_hash[1:].split('^')
+        cdekey, cdetype = legacy_hash[1:].split('^')
     else:
+        cdekey = legacy_hash
         # Legacy md5 hash of the full path, there's no cdeType, assume EBOK.
-        # NOTE: If we ever need a real cdeType, do it properly by getting it from the db, and not the json
-        cdeType = u'EBOK'
-        cdeKey = legacy_hash
-    return cdeType, cdeKey
+        cdetype = u'EBOK'
+    return cdekey, cdetype
 
 def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_contents):
 
@@ -108,12 +107,12 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
             db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
             collection_idx = len(db_collections)-1
         for ebook_hash in ebook_hashes_list:
-            cdeType, cdeKey = parse_legacy_hash(ebook_hash)
+            cdekey, cdetype = parse_legacy_hash(ebook_hash)
             # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
             # find ebook by cdeKey
-            ebook_idx = find_ebook(db_ebooks, cdeKey)
+            ebook_idx = find_ebook(db_ebooks, cdekey)
             if ebook_idx == -1:
-                print("Couldn't match a db uuid to cdeKey %s (book not on device?)", cdeKey)
+                print("Couldn't match a db uuid to cdeKey %s (book not on device?)", cdekey)
                 continue # invalid
             # update ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
@@ -230,5 +229,6 @@ if __name__ == "__main__":
             elif command == "delete":
                 kh_msg("Deleting all collections . . .", 'I', 'v')
                 delete_all_collections(c)
-    except:
+    except Exception, e:
         kh_msg("Something went wrong.", 'I', 'v')
+        print e
