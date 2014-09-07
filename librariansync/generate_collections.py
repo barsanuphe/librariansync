@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import subprocess, json, os, uuid, time, sys, shutil, locale, codecs
+import subprocess, json, os, uuid, time, sys, shutil, locale, codecs, re
 import sqlite3, requests
 from collections import defaultdict
 
@@ -64,10 +64,12 @@ def parse_config(config_file):
 
 def parse_calibre_plugin_config(config_file):
     calibre_plugin_config = json.load(open(config_file, 'r'), 'utf8')
-    collection_names = [el.split("@")[0] for el in calibre_plugin_config.keys()]
+    # Handle the locale properly (it might not be here, or the collection name might contain an @, so split doesn't cut it). RegEx borrowed from the KCP.
+    coll_name_pattern = re.compile(r'^(.*)@[^@]+$')
+    collection_names = [coll_name_pattern.sub(r'\1', el) for el in calibre_plugin_config.keys()]
     collection_members_uuid = defaultdict(list) # collection_label: [ebook_uuid, ...]
     for collection in calibre_plugin_config.keys():
-        collection_members_uuid[collection.split("@")[0]].extend( calibre_plugin_config[collection]["items"])
+        collection_members_uuid[coll_name_pattern.sub(r'\1', collection)].extend( calibre_plugin_config[collection]["items"])
     return collection_members_uuid
 
 #-------- Folders
@@ -317,7 +319,10 @@ def update_cc_db_from_calibre_plugin_json(complete_rebuild = True):
         for cur_hash in collection_members_uuid[collection_label]:
             cdeType, cdeKey = parse_legacy_hash(cur_hash)
             # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
-            ebook_db_uuids.append(db_ebooks[cdeKey])
+            if cdeKey in db_ebooks:
+                ebook_db_uuids.append(db_ebooks[cdeKey])
+            else:
+                print "Couldn't get a DB uuid for cdeKey: {} ! Make sure it's actually on the device.".format(cdeKey)
         if collection_label not in db_collections.keys():
             # create
             new_uuid = uuid.uuid4()
