@@ -189,6 +189,9 @@ def export_existing_collections(c):
     with codecs.open(CALIBRE_PLUGIN_FILE, "w", "utf8") as export_json:
         export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
 
+    # Assume it won't fail.
+    kh_msg("Success.", 'I', 'v')
+
 def delete_all_collections(c):
     # build dictionaries of ebooks/collections with their uuids
     db_ebooks, db_collections = parse_entries(c)
