@@ -83,9 +83,9 @@ def find_collection(collections, collection_uuid_or_label):
             return i
     return -1
 
-# same for uuid & location
-def find_ebook(ebooks, ebook_uuid_or_location):
+# same for uuid & location. Note that we add matching an uuid to a cdeKey in order to handle the legacy json db schema.
+def find_ebook(ebooks, ebook_uuid_or_location_or_cdekey):
     for (i,ebook) in enumerate(ebooks):
-        if ebook.uuid == ebook_uuid_or_location or ebook.location == ebook_uuid_or_location:
+        if ebook.uuid == ebook_uuid_or_location_or_cdekey or ebook.location == ebook_uuid_or_location_or_cdekey or ebook.cdekey == ebook_uuid_or_location_or_cdekey:
             return i
     return -1

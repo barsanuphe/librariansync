@@ -65,7 +65,7 @@ def parse_calibre_plugin_config(config_file):
 def update_lists_from_librarian_json(db_ebooks, db_collections, collection_contents):
 
     for (ebook_location, ebook_collection_labels_list) in collection_contents.items():
-        #find ebook by location
+        # find ebook by location
         ebook_idx = find_ebook(db_ebooks, os.path.join(KINDLE_EBOOKS_ROOT,ebook_location))
         if ebook_idx == -1:
             print("Invalid location", ebook_location)
@@ -100,20 +100,20 @@ def parse_legacy_hash(legacy_hash):
 
 def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_contents):
 
-    for (collection_label, ebook_uuids_list) in collection_contents.items():
+    for (collection_label, ebook_hashes_list) in collection_contents.items():
         # find collection by label
         collection_idx = find_collection(db_collections, collection_label)
         if collection_idx == -1:
             # creating new collection object
             db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
             collection_idx = len(db_collections)-1
-        for ebook_uuid in ebook_uuids_list:
-            cdeType, ebook_uuid = parse_legacy_hash(ebook_uuid)
+        for ebook_hash in ebook_hashes_list:
+            cdeType, cdeKey = parse_legacy_hash(ebook_hash)
             # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
-            # find ebook by uuid
-            ebook_idx = find_ebook(db_ebooks, ebook_uuid)
+            # find ebook by cdeKey
+            ebook_idx = find_ebook(db_ebooks, cdeKey)
             if ebook_idx == -1:
-                print("Invalid uuid", ebook_uuid)
+                print("Couldn't match a db uuid to cdeKey %s (book not on device?)", cdeKey)
                 continue # invalid
             # update ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
