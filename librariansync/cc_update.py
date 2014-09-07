@@ -89,5 +89,7 @@ class CCUpdate(object):
         kh_msg("Sending commands to the framework . . .", 'I', 'v')
         full_command = { "commands" : self.commands, "type" : "ChangeRequest", "id" : 1 }
         r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
-        #print full_command
-        #print r.json()
+        if r.json()[u"ok"]:
+            kh_msg("Success.", 'I', 'v')
+        else:
+            kh_msg("Oh, no. It failed.", 'I', 'v')

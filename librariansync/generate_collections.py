@@ -88,7 +88,7 @@ def update_lists_from_librarian_json(db_ebooks, db_collections, collection_conte
     return db_ebooks, db_collections
 
 # Return a cdeType, cdeKey couple from a legacy json hash
-def parse_legacy_hash(legacy_hash): #TODO: legacy hash from calibre plugin json
+def parse_legacy_hash(legacy_hash):
     if legacy_hash.startswith('#'):
         cdeKey, cdeType = legacy_hash[1:].split('^')
     else:
@@ -203,26 +203,29 @@ def delete_all_collections(c):
 
 if __name__ == "__main__":
     command = sys.argv[1]
-    with sqlite3.connect(KINDLE_DB_PATH) as cc_db:
-        c = cc_db.cursor()
-        if command == "add":
-            kh_msg("Updating collections (librarian) . . .", 'I', 'v')
-            update_cc_db(c, complete_rebuild = False, source = "librarian")
-        elif command == "rebuild":
-            kh_msg("Rebuilding collections (librarian) . . .", 'I', 'v')
-            update_cc_db(c, complete_rebuild = True, source = "librarian")
-        elif command == "rebuild_from_folders":
-            kh_msg("Rebuilding collections (directory structure) . . .", 'I', 'v')
-            update_cc_db(c, complete_rebuild = True, source = "folders")
-        elif command == "rebuild_from_calibre_plugin_json":
-            kh_msg("Rebuilding collections (Calibre) . . .", 'I', 'v')
-            update_cc_db(c, complete_rebuild = True, source = "calibre_plugin")
-        elif command == "rebuild_from_calibre_plugin_json":
-            kh_msg("Updating collections (Calibre) . . .", 'I', 'v')
-            update_cc_db(c, complete_rebuild = False, source = "calibre_plugin")
-        elif command == "export":
-            kh_msg("Exporting collections . . .", 'I', 'v')
-            export_existing_collections(c)
-        elif command == "delete":
-            kh_msg("Deleting all collections . . .", 'I', 'v')
-            delete_all_collections(c)
+    try:
+        with sqlite3.connect(KINDLE_DB_PATH) as cc_db:
+            c = cc_db.cursor()
+            if command == "add":
+                kh_msg("Updating collections (librarian) . . .", 'I', 'v')
+                update_cc_db(c, complete_rebuild = False, source = "librarian")
+            elif command == "rebuild":
+                kh_msg("Rebuilding collections (librarian) . . .", 'I', 'v')
+                update_cc_db(c, complete_rebuild = True, source = "librarian")
+            elif command == "rebuild_from_folders":
+                kh_msg("Rebuilding collections (directory structure) . . .", 'I', 'v')
+                update_cc_db(c, complete_rebuild = True, source = "folders")
+            elif command == "rebuild_from_calibre_plugin_json":
+                kh_msg("Rebuilding collections (Calibre) . . .", 'I', 'v')
+                update_cc_db(c, complete_rebuild = True, source = "calibre_plugin")
+            elif command == "rebuild_from_calibre_plugin_json":
+                kh_msg("Updating collections (Calibre) . . .", 'I', 'v')
+                update_cc_db(c, complete_rebuild = False, source = "calibre_plugin")
+            elif command == "export":
+                kh_msg("Exporting collections . . .", 'I', 'v')
+                export_existing_collections(c)
+            elif command == "delete":
+                kh_msg("Deleting all collections . . .", 'I', 'v')
+                delete_all_collections(c)
+    except:
+        kh_msg("Something went wrong.", 'I', 'v')
