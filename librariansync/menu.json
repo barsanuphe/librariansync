@@ -33,7 +33,7 @@
 			"checked": true,
 			"refresh": false,
 			"status": false,
-			"internal": "status Rebuilding collections (from directory sructure) . . .",
+			"internal": "status Rebuilding collections (from directory structure) . . .",
 			"action": "./librariansync.sh",
 			"params": "rebuild_from_folders"
 		},

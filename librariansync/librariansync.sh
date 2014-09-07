@@ -126,7 +126,7 @@ generate_collections()
 	command="${1}"
 
 	# Let's go!
-	kh_msg "${command} . . ." I v
+	#kh_msg "${command} . . ." I v
 
 	# Call our Python script
 	/mnt/us/python/bin/python2.7 "${PWD}/generate_collections.py" "${command}"
