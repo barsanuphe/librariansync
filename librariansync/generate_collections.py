@@ -365,6 +365,7 @@ def update_cc_db(complete_rebuild = True, from_json = True):
         collections_contents = list_folder_contents()
     # update kindle db accordingly
     update_kindle_db(c, db_ebooks, db_collections, collections_contents, complete_rebuild)
+    cc_db.close()
 
 # Return a cdeType, cdeKey couple from a legacy json hash
 def parse_legacy_hash(legacy_hash):
@@ -415,6 +416,7 @@ def update_cc_db_from_calibre_plugin_json(complete_rebuild = True):
             collections_dict[db_collections[collection_label]].extend(ebook_db_uuids)
 
     actually_update_db(commands, collections_dict)
+    cc_db.close()
 
 def export_existing_collections():
     cc_db = sqlite3.connect(KINDLE_DB_PATH)
@@ -444,6 +446,7 @@ def export_existing_collections():
     export_json = codecs.open(EXPORT, "w", "utf8")
     export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
     export_json.close()
+    cc_db.close()
 
 def delete_all_collections():
     cc_db = sqlite3.connect(KINDLE_DB_PATH)
@@ -460,6 +463,7 @@ def delete_all_collections():
         commands.append( delete_collection_json(coll_uuid) )
 
     send_post_commands(commands)
+    cc_db.close()
 
 if __name__ == "__main__":
     command = sys.argv[1]
