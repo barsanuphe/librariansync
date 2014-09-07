@@ -197,7 +197,7 @@ def actually_update_db(commands, collections_dict):
         for ebook_uuid in ebook_uuids:
             ebook_dict[ebook_uuid] += 1
 
-    # No-op on non-Cloud Collections aware FW
+    # Can't do that on non-Cloud Collections aware FW
     if is_cloud_aware():
         for ebook in ebook_dict.keys():
             commands.append( update_ebook_entry_if_in_collection(ebook, ebook_dict[ebook]) )
