@@ -10,6 +10,7 @@ from kindle_contents import *
 from kindle_logging import *
 
 #-------- Config
+LIBRARIAN_SYNC =        "LibrarianSync"
 KINDLE_DB_PATH =        "/var/local/cc.db"
 TAGS =                  "../collections.json"
 CALIBRE_PLUGIN_FILE =   "/mnt/us/system/collections.json"
@@ -203,29 +204,36 @@ def delete_all_collections(c):
 
 if __name__ == "__main__":
     command = sys.argv[1]
+
+    log(LIBRARIAN_SYNC, "main", "Starting...")
     try:
         with sqlite3.connect(KINDLE_DB_PATH) as cc_db:
             c = cc_db.cursor()
-            if command == "add":
-                kh_msg("Updating collections (librarian) . . .", 'I', 'v')
+            if command == "update":
+                log(LIBRARIAN_SYNC, "update", "Updating collections (librarian)...")
                 update_cc_db(c, complete_rebuild = False, source = "librarian")
             elif command == "rebuild":
-                kh_msg("Rebuilding collections (librarian) . . .", 'I', 'v')
+                log(LIBRARIAN_SYNC, "rebuild", "Rebuilding collections (librarian)...")
                 update_cc_db(c, complete_rebuild = True, source = "librarian")
+
             elif command == "rebuild_from_folders":
-                kh_msg("Rebuilding collections (directory structure) . . .", 'I', 'v')
+                log(LIBRARIAN_SYNC, "rebuild_from_folders", "Rebuilding collections (folders)...")
                 update_cc_db(c, complete_rebuild = True, source = "folders")
+
             elif command == "rebuild_from_calibre_plugin_json":
-                kh_msg("Rebuilding collections (Calibre) . . .", 'I', 'v')
+                log(LIBRARIAN_SYNC, "rebuild_from_calibre_plugin_json", "Rebuilding collections (Calibre)...")
                 update_cc_db(c, complete_rebuild = True, source = "calibre_plugin")
-            elif command == "rebuild_from_calibre_plugin_json":
-                kh_msg("Updating collections (Calibre) . . .", 'I', 'v')
+            elif command == "update_from_calibre_plugin_json":
+                log(LIBRARIAN_SYNC, "update_from_calibre_plugin_json", "Updating collections (Calibre)...")
                 update_cc_db(c, complete_rebuild = False, source = "calibre_plugin")
+
             elif command == "export":
-                kh_msg("Exporting collections . . .", 'I', 'v')
+                log(LIBRARIAN_SYNC, "export", "Exporting collections...")
                 export_existing_collections(c)
             elif command == "delete":
-                kh_msg("Deleting all collections . . .", 'I', 'v')
+                log(LIBRARIAN_SYNC, "delete", "Deleting all collections...")
                 delete_all_collections(c)
     except:
-        kh_msg("Something went wrong.", 'I', 'v')
+        log(LIBRARIAN_SYNC, "main", "Something went very wrong.", "E")
+    else:
+        log(LIBRARIAN_SYNC, "main", "Done.")

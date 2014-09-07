@@ -86,10 +86,10 @@ class CCUpdate(object):
                 } )
 
     def execute(self):
-        kh_msg("Sending commands to the framework . . .", 'I', 'v')
+        log(LIBRARIAN_SYNC, "cc_update", "Sending commands...")
         full_command = { "commands" : self.commands, "type" : "ChangeRequest", "id" : 1 }
         r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
         if r.json()[u"ok"]:
-            kh_msg("Success.", 'I', 'v')
+            log(LIBRARIAN_SYNC, "cc_update", "Success.")
         else:
-            kh_msg("Oh, no. It failed.", 'I', 'v')
+            log(LIBRARIAN_SYNC, "cc_update", "Oh, no. It failed.", "E")

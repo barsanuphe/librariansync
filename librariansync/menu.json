@@ -24,7 +24,7 @@
             "status": false,
             "internal": "status Updating collections (from librarian) . . .",
             "action": "python generate_collections.py",
-            "params": "add"
+            "params": "update"
         },
         {
             "name": "Rebuild collections (from folders)",
