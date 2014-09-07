@@ -1,52 +1,76 @@
 {
-    "items": [
-        {
-            "name": "Librarian Sync",
-            "priority": -1,
-            "items": [
-                {
-                    "name": "Rebuild collections (from json)",
-                    "priority": -1,
-                    "exitmenu": false,
-                    "status": false,
-                    "action": "python generate_collections.py rebuild"
-                },
-                {
-                    "name": "Add to collections (from json)",
-                    "priority": -1,
-                    "exitmenu": false,
-                    "status": false,
-                    "action": "python generate_collections.py add"
-                },
-                {
-                    "name": "Rebuild collections (from folders)",
-                    "priority": -1,
-                    "exitmenu": false,
-                    "status": false,
-                    "action": "python generate_collections.py rebuild_from_folders"
-                },
-                {
-                    "name": "Update collections (from calibre plugin json)",
-                    "priority": -1,
-                    "exitmenu": false,
-                    "status": false,
-                    "action": "python generate_collections.py update_from_calibre_plugin_json"
-                },
-                {
-                    "name": "Rebuild collections (from calibre plugin json)",
-                    "priority": -1,
-                    "exitmenu": false,
-                    "status": false,
-                    "action": "python generate_collections.py rebuild_from_calibre_plugin_json"
-                },
-                {
-                    "name": "Export current collections",
-                    "priority": -1,
-                    "exitmenu": false,
-                    "status": false,
-                    "action": "python generate_collections.py export"
-                }
-            ]
-        }
-    ]
+	"items": [
+	{
+		"name": "Librarian Sync",
+		"priority": -1,
+		"items": [
+		{
+			"name": "Rebuild collections (from json)",
+			"priority": 1,
+			"exitmenu": false,
+			"checked": true,
+			"refresh": false,
+			"status": false,
+			"internal": "status Rebuilding collections (from librarian) . . .",
+			"action": "librariansync.sh",
+			"params": "rebuild"
+		},
+		{
+			"name": "Update collections (from json)",
+			"priority": 2,
+			"exitmenu": false,
+			"checked": true,
+			"refresh": false,
+			"status": false,
+			"internal": "status Updating collections (from librarian) . . .",
+			"action": "librariansync.sh",
+			"params": "add"
+		},
+		{
+			"name": "Rebuild collections (from folders)",
+			"priority": 3,
+			"exitmenu": false,
+			"checked": true,
+			"refresh": false,
+			"status": false,
+			"internal": "status Rebuilding collections (from directory sructure) . . .",
+			"action": "librariansync.sh",
+			"params": "rebuild_from_folders"
+		},
+		{
+			"name": "Rebuild collections (from calibre plugin json)",
+			"priority": 4,
+			"exitmenu": false,
+			"checked": true,
+			"refresh": false,
+			"status": false,
+			"internal": "status Rebuilding collections (from Calibre) . . .",
+			"action": "librariansync.sh",
+			"params": "rebuild_from_calibre_plugin_json"
+		},
+		{
+			"name": "Update collections (from calibre plugin json)",
+			"priority": 5,
+			"exitmenu": false,
+			"checked": true,
+			"refresh": false,
+			"status": false,
+			"internal": "status Updating collections (from Calibre) . . .",
+			"action": "librariansync.sh",
+			"params": "update_from_calibre_plugin_json"
+		},
+		{
+			"name": "Export current collections",
+			"priority": 6,
+			"exitmenu": false,
+			"checked": true,
+			"refresh": false,
+			"status": false,
+			"internal": "status Exporting collections . . .",
+			"action": "librariansync.sh",
+			"params": "export"
+		}
+		]
+	}
+	]
 }
