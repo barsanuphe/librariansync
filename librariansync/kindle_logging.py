@@ -1,9 +1,10 @@
-import os, syslog, subprocess
+import os, syslog, subprocess, time
+
+
+LIBRARIAN_SYNC = "LibrarianSync"
 
 
 #-------- Logging & user feedback (from the K5 Fonts Hack)
-# NOTE: Hardcode HACKNAME for now
-HACKNAME="librariansync"
 
 # We'll need this to kill stderr
 DEVNULL = open(os.devnull, 'wb')
@@ -32,50 +33,34 @@ else:
 EIPS_MAXCHARS=SCREEN_X_RES / EIPS_X_RES
 EIPS_MAXLINES=SCREEN_Y_RES / EIPS_Y_RES
 
-def kh_msg(msg, level='I', show='a', eips_msg=None):
-    # Check if we want to trigger an additionnal eips print
-    if show == 'q':
-        show_eips=False
-    elif show == 'v':
-        show_eips=True
-    else:
-        # NOTE: No verbose mode handling
-        show_eips=False
+def log(program, function, msg, level = "I", display = True):
 
-    # Unless we specified a different message, print the full message over eips
-    if not eips_msg:
-        eips_msg=msg
-
-    # Setup syslog
-    syslog.openlog('system: {} {}:kh_msg::'.format(level, HACKNAME))
+    # open syslog
+    syslog.openlog('system: %s %s:%s:'%(level, program, function))
+    # set priority
+    priority = syslog.LOG_INFO
     if level == "E":
         priority = syslog.LOG_ERR
     elif level == "W":
         priority = syslog.LOG_WARNING
-    else:
-        priority = syslog.LOG_INFO
     priority |= syslog.LOG_LOCAL4
-    # Print to log
+    # write to syslog
     syslog.syslog(priority, msg)
+    #
+    # NOTE: showlog / showlog -f to check the logs
+    #
 
-    # Do we want to trigger an eips print?
-    if show_eips:
-        # NOTE: Hardcode the tag
-        eips_tag="L"
-
+    if display:
+        program_display = " %s: "%program
+        displayed = " "
         # If loglevel is anything else than I, add it to our tag
         if level != "I":
-            eips_tag+=" {}".format(level)
-
-        # Add a leading whitespace to avoid starting right at the left edge of the screen...
-        eips_tag=" {}".format(eips_tag)
-
-        # Tag our message
-        eips_msg="{} {}".format(eips_tag, eips_msg)
-
-        # Pad with blanks
-        eips_msg='{0: <{maxchars}}'.format(eips_msg, maxchars=EIPS_MAXCHARS)
-
-        # And print it (bottom of the screen)
-        eips_y_pos=EIPS_MAXLINES - 2
-        subprocess.call(['eips', '0', str(eips_y_pos), eips_msg], stderr=DEVNULL)
+            displayed += "[%s] "%level
+        displayed += msg
+        # pad with blanks
+        displayed += (EIPS_MAXCHARS - len(displayed))*' '
+        # print using eips
+        subprocess.call(['eips', '0', str(EIPS_MAXLINES - 3), program_display], stderr = DEVNULL)
+        subprocess.call(['eips', '0', str(EIPS_MAXLINES - 2), displayed], stderr = DEVNULL)
+        # to prevent text garbling if two logs sent too fast
+        time.sleep(0.25)

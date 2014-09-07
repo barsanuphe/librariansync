@@ -284,7 +284,7 @@ which contains two entries:
 
 - *Rebuild collections (from json)* :
     to clear all existing collections and rebuild them using the json file
-- *Add to collections (from json)* :
+- *Update collections (from json)* :
     to only add ebooks to existing or new collections, using the json file
 - *Rebuild collections (from folders)* :
     to clear all existing collections and rebuild them using the folder structure
@@ -292,9 +292,13 @@ which contains two entries:
 - *Rebuild collections (from calibre plugin json)* :
     to clear all existing collections and rebuild them using a json file generated
     by the Calibre Kindle collections plugin
+- *Update collections (from calibre plugin json)* :
+    to only add ebooks to existing or new collections, using a json file generated
+    by the Calibre Kindle collections plugin
 - *Export current collections* :
     generates exported_collections.json in the **extensions** folder from current
     collections.
+- *Delete all collections*
 
 ### What it does
 
@@ -321,6 +325,8 @@ When *exporting collections*, a new file, exported_collections.json, is created
 from the current collections in the **extensions** folder. This file can be
 backed up, modified, and used to *rebuild collections* (if renamed
 *collections.json*).
+At the same time, another json file is written, to be used with the Calibre
+Kindle plugin.
 
 Always allow for a few seconds for the Kindle database and interface to reflect the
 changes made.

@@ -35,8 +35,7 @@ def get_relative_path(path):
     else:
         return path.split(KINDLE_EBOOKS_ROOT)[1]
 
-
-
+#-------- Ebooks and Collections
 class Ebook(object):
     def __init__(self, uuid, location, cdekey, cdetype):
         self.uuid = uuid
