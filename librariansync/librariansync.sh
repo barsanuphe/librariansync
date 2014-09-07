@@ -158,6 +158,9 @@ case "${1}" in
 	"export" )
 		generate_collections "${1}"
 	;;
+        "delete" )
+		generate_collections "${1}"
+	;;
 	* )
 		kh_msg "invalid action (${1})" W v "invalid action"
 	;;

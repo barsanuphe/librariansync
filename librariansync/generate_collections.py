@@ -445,6 +445,22 @@ def export_existing_collections():
     export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
     export_json.close()
 
+def delete_all_collections():
+    cc_db = sqlite3.connect(KINDLE_DB_PATH)
+    c = cc_db.cursor()
+
+    db_collections = {}
+    c.execute(SELECT_COLLECTION_ENTRIES)
+    for (uuid, label) in c.fetchall():
+        db_collections[label] = uuid
+
+    commands = []
+    # remove all previous collections
+    for coll_uuid in db_collections.values():
+        commands.append( delete_collection_json(coll_uuid) )
+
+    send_post_commands(commands)
+
 if __name__ == "__main__":
     command = sys.argv[1]
     if command == "add":
@@ -465,3 +481,6 @@ if __name__ == "__main__":
     elif command == "export":
         kh_msg("Exporting collections (Calibre) . . .", 'I', 'v')
         export_existing_collections()
+    elif command == "delete":
+        kh_msg("Deleting all collections . . .", 'I', 'v')
+        delete_all_collections()

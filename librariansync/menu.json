@@ -69,6 +69,27 @@
 			"internal": "status Exporting collections . . .",
 			"action": "./librariansync.sh",
 			"params": "export"
+		},
+		{
+			"name": "********",
+			"priority": 7,
+			"exitmenu": false,
+			"checked": false,
+			"refresh": false,
+			"status": false,
+			"internal": "status noop",
+			"action": ":"
+		},
+		{
+			"name": "Delete all collections",
+			"priority": 8,
+			"exitmenu": false,
+			"checked": true,
+			"refresh": false,
+			"status": false,
+			"internal": "status Deleting all collections . . .",
+			"action": "./librariansync.sh",
+			"params": "delete"
 		}
 		]
 	}
