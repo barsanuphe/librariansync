@@ -16,7 +16,8 @@ SUPPORTED_EXTENSIONS = [".azw",
                         ".html",
                         ".htm",
                         ".jpg",
-                        ".jpeg"]
+                        ".jpeg",
+                        ".azw2"]
 
 #-------- Folders
 def list_folder_contents():
