@@ -63,7 +63,7 @@ class Collection(object):
     def add_ebook(self, ebook):
         self.ebooks.append(ebook)
 
-    # Build a legacy hashes list from the cdeType & cdeKey couple of our book list
+    # Build a legacy hashes list from the cdeType & cdeKey couples of our book list
     def build_legacy_hashes_list(self):
         hashes_list = []
         for e in self.ebooks:
