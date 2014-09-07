@@ -81,8 +81,18 @@
 			"action": ":"
 		},
 		{
-			"name": "Delete all collections",
+			"name": "********",
 			"priority": 8,
+			"exitmenu": false,
+			"checked": false,
+			"refresh": false,
+			"status": false,
+			"internal": "status noop",
+			"action": ":"
+		},
+		{
+			"name": "Delete all collections",
+			"priority": 9,
 			"exitmenu": false,
 			"checked": true,
 			"refresh": false,
