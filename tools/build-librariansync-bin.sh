@@ -2,7 +2,7 @@
 
 HACKNAME="librariansync"
 PKGNAME="${HACKNAME}"
-PKGVER="1.1"
+PKGVER=$1
 DEVICE="pw2"
 
 # check for kindletool

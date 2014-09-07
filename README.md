@@ -292,7 +292,7 @@ which contains two entries:
 - *Rebuild collections (from calibre plugin json)* :
     to clear all existing collections and rebuild them using a json file generated
     by the Calibre Kindle collections plugin
- - *Export current collections* :
+- *Export current collections* :
     generates exported_collections.json in the **extensions** folder from current
     collections.
 
