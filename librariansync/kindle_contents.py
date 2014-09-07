@@ -16,7 +16,8 @@ SUPPORTED_EXTENSIONS = [".azw",
                         ".html",
                         ".htm",
                         ".jpg",
-                        ".jpeg"]
+                        ".jpeg",
+                        ".azw2"]
 
 #-------- Folders
 def list_folder_contents():
@@ -36,10 +37,11 @@ def get_relative_path(path):
 
 #-------- Ebooks and Collections
 class Ebook(object):
-    def __init__(self, uuid, location, cdekey):
+    def __init__(self, uuid, location, cdekey, cdetype):
         self.uuid = uuid
         self.location = location
         self.cdekey = cdekey
+        self.cdetype = cdetype
         self.collections = []
 
     def add_collection(self, collection):
@@ -61,13 +63,25 @@ class Collection(object):
     def add_ebook(self, ebook):
         self.ebooks.append(ebook)
 
+    # Build a legacy hashes list from the cdeType & cdeKey couple of our book list
+    def build_legacy_hashes_list(self):
+        hashes_list = []
+        for e in self.ebooks:
+            if e.cdekey.startswith('*'):
+                # No ASIN set, we don't care about the cdeType, use it as-is
+                hashes_list.append(e.cdekey)
+            else:
+                # Proper or fake ASIN set, build the hash
+                hashes_list.append('#{}^{}'.format(e.cdekey, e.cdetype))
+        return hashes_list
+
     def to_calibre_plugin_json(self):
         if self.ebooks == []:
             return {}
         else:
             return { "%s@%s"%(self.label, locale.getdefaultlocale()[0]):
                         {
-                                "items": [e.uuid for e in self.ebooks],
+                                "items": self.build_legacy_hashes_list(),
                                 "lastAccess": int(time.time())
                         }
                    }
@@ -81,9 +95,9 @@ def find_collection(collections, collection_uuid_or_label):
             return i
     return -1
 
-# same for uuid & location
-def find_ebook(ebooks, ebook_uuid_or_location):
+# same for uuid & location. Note that we add matching an uuid to a cdeKey in order to handle the legacy json db schema.
+def find_ebook(ebooks, ebook_uuid_or_location_or_cdekey):
     for (i,ebook) in enumerate(ebooks):
-        if ebook.uuid == ebook_uuid_or_location or ebook.location == ebook_uuid_or_location:
+        if ebook.uuid == ebook_uuid_or_location_or_cdekey or ebook.location == ebook_uuid_or_location_or_cdekey or ebook.cdekey == ebook_uuid_or_location_or_cdekey:
             return i
     return -1

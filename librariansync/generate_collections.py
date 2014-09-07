@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import subprocess, json, os, uuid, sys, shutil, codecs, re, syslog
+import json, os, uuid, sys, codecs, re
 import sqlite3
 from collections import defaultdict
 
@@ -17,9 +17,9 @@ CALIBRE_PLUGIN_FILE =   "/mnt/us/system/collections.json"
 EXPORT =                "../exported_collections.json"
 KINDLE_EBOOKS_ROOT =    "/mnt/us/documents/"
 
-SELECT_COLLECTION_ENTRIES =    'select p_uuid, p_titles_0_nominal          from Entries where p_type = "Collection"'
-SELECT_EBOOK_ENTRIES =         'select p_uuid, p_location, p_cdeKey        from Entries where p_type = "Entry:Item"'
-SELECT_EXISTING_COLLECTIONS =  'select i_collection_uuid, i_member_uuid    from Collections'
+SELECT_COLLECTION_ENTRIES =    'select p_uuid, p_titles_0_nominal                     from Entries where p_type = "Collection"'
+SELECT_EBOOK_ENTRIES =         'select p_uuid, p_location, p_cdeKey, p_cdeType        from Entries where p_type = "Entry:Item"'
+SELECT_EXISTING_COLLECTIONS =  'select i_collection_uuid, i_member_uuid               from Collections'
 
 #-------- Existing Kindle database entries
 def parse_entries(cursor):
@@ -31,10 +31,10 @@ def parse_entries(cursor):
         db_collections.append(Collection(uuid, label))
 
     cursor.execute(SELECT_EBOOK_ENTRIES)
-    for (uuid, location, cdekey) in cursor.fetchall():
+    for (uuid, location, cdekey, cdetype) in cursor.fetchall():
         # only consider user ebooks
         if location is not None and KINDLE_EBOOKS_ROOT in location:
-            db_ebooks.append(Ebook(uuid, location, cdekey))
+            db_ebooks.append(Ebook(uuid, location, cdekey, cdetype))
 
     cursor.execute(SELECT_EXISTING_COLLECTIONS)
     for (collection_uuid, ebook_uuid) in cursor.fetchall():
@@ -66,7 +66,7 @@ def parse_calibre_plugin_config(config_file):
 def update_lists_from_librarian_json(db_ebooks, db_collections, collection_contents):
 
     for (ebook_location, ebook_collection_labels_list) in collection_contents.items():
-        #find ebook by location
+        # find ebook by location
         ebook_idx = find_ebook(db_ebooks, os.path.join(KINDLE_EBOOKS_ROOT,ebook_location))
         if ebook_idx == -1:
             print("Invalid location", ebook_location)
@@ -88,35 +88,34 @@ def update_lists_from_librarian_json(db_ebooks, db_collections, collection_conte
 
     return db_ebooks, db_collections
 
-# Return a cdeType, cdeKey couple from a legacy json hash
+# Return a cdeKey, cdeType couple from a legacy json hash
 def parse_legacy_hash(legacy_hash):
     if legacy_hash.startswith('#'):
-        cdeKey, cdeType = legacy_hash[1:].split('^')
+        cdekey, cdetype = legacy_hash[1:].split('^')
     else:
+        cdekey = legacy_hash
         # Legacy md5 hash of the full path, there's no cdeType, assume EBOK.
-        # NOTE: If we ever need a real cdeType, do it properly by getting it from the db, and not the json
-        cdeType = u'EBOK'
-        cdeKey = legacy_hash
-    return cdeType, cdeKey
+        cdetype = u'EBOK'
+    return cdekey, cdetype
 
 def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_contents):
 
-    for (collection_label, ebook_uuids_list) in collection_contents.items():
+    for (collection_label, ebook_hashes_list) in collection_contents.items():
         # find collection by label
         collection_idx = find_collection(db_collections, collection_label)
         if collection_idx == -1:
             # creating new collection object
             db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
             collection_idx = len(db_collections)-1
-        for ebook_uuid in ebook_uuids_list:
-            cdeType, ebook_uuid = parse_legacy_hash(ebook_uuid)
+        for ebook_hash in ebook_hashes_list:
+            cdekey, cdetype = parse_legacy_hash(ebook_hash)
             # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
-            #find ebook by uuid
-            ebook_idx = find_ebook(db_ebooks, ebook_uuid)
+            # find ebook by cdeKey
+            ebook_idx = find_ebook(db_ebooks, cdekey)
             if ebook_idx == -1:
-                print("Invalid uuid", ebook_uuid)
+                print("Couldn't match a db uuid to cdeKey %s (book not on device?)", cdekey)
                 continue # invalid
-            # udpate ebook
+            # update ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
             # update collection
             db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
@@ -233,7 +232,8 @@ if __name__ == "__main__":
             elif command == "delete":
                 log(LIBRARIAN_SYNC, "delete", "Deleting all collections...")
                 delete_all_collections(c)
-    except:
+    except Exception, e:
         log(LIBRARIAN_SYNC, "main", "Something went very wrong.", "E")
+        print e
     else:
         log(LIBRARIAN_SYNC, "main", "Done.")
