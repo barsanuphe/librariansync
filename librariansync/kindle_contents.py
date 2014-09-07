@@ -1,4 +1,5 @@
-import os
+import os, locale, time
+
 KINDLE_EBOOKS_ROOT =    "/mnt/us/documents/"
 
 SUPPORTED_EXTENSIONS = [".azw",
@@ -62,7 +63,15 @@ class Collection(object):
         self.ebooks.append(ebook)
 
     def to_calibre_plugin_json(self):
-        pass #TODO
+        if self.ebooks == []:
+            return {}
+        else:
+            return { "%s@%s"%(self.label, locale.getdefaultlocale()[0]):
+                        {
+                                "items": [e.uuid for e in self.ebooks],
+                                "lastAccess": int(time.time())
+                        }
+                   }
 
 
 # it would be very, very unlucky to have a collision

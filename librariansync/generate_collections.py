@@ -11,7 +11,7 @@ from kindle_contents import *
 KINDLE_DB_PATH =        "/var/local/cc.db"
 TAGS =                  "../collections.json"
 CALIBRE_PLUGIN_FILE =   "/mnt/us/system/collections.json"
-EXPORT =                "../exported_collections.json"
+EXPORT =                "../exported_collections_%s.json"
 KINDLE_EBOOKS_ROOT =    "/mnt/us/documents/"
 
 SELECT_COLLECTION_ENTRIES =    'select p_uuid, p_titles_0_nominal          from Entries where p_type = "Collection"'
@@ -162,7 +162,14 @@ def export_existing_collections(c):
     for ebook in db_ebooks:
         export.update(ebook.to_librarian_json())
 
-    with codecs.open(EXPORT, "w", "utf8") as export_json:
+    with codecs.open(EXPORT%"librarian", "w", "utf8") as export_json:
+        export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
+
+    export = {}
+    for collection in db_collections:
+        export.update(collection.to_calibre_plugin_json())
+
+    with codecs.open(EXPORT%"calibre_plugin", "w", "utf8") as export_json:
         export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
 
 #-------------------------------------------------------
