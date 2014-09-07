@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import subprocess, json, os, uuid, sys, shutil, codecs, re, syslog
+import json, os, uuid, sys, codecs, re
 import sqlite3
 from collections import defaultdict
 
