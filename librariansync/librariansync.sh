@@ -118,9 +118,6 @@ generate_collections()
 		return 1
 	fi
 
-	# Need to shift a bit to have consistent positional params
-	shift
-
 	if [ $# -lt 1 ] ; then
 		kh_msg "not enough arguments passed to generate_collections ($# while we need at least 1)" W v "missing command"
 		return 1
@@ -129,7 +126,7 @@ generate_collections()
 	command="${1}"
 
 	# Let's go!
-	kh_msg "Starting a ${command} action . . ." I v
+	kh_msg "${command} . . ." I v
 
 	# Call our Python script
 	/mnt/us/python/bin/python2.7 "${PWD}/generate_collections.py" "${command}"
