@@ -1,3 +1,4 @@
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
 import subprocess, json, os, uuid, time, sys, shutil, locale, codecs, re
