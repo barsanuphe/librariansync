@@ -16,7 +16,7 @@ SELECT_EBOOK_ENTRIES =                      'select p_uuid, p_location          
 SELECT_EBOOK_ENTRIES_FOR_CALIBRE =          'select p_uuid, p_cdeKey                    from Entries where p_type = "Entry:Item"'
 SELECT_EXISTING_COLLECTIONS =               'select i_collection_uuid, i_member_uuid    from Collections'
 
-SUPPORTED_EXTENSIONS = [".azw", ".mobi", ".prc", ".pobi", ".azw3", ".azw6", ".yj", ".azw1", ".tpz", ".pdf", ".txt", ".html", ".htm", ".jpg", ".jpeg"]
+SUPPORTED_EXTENSIONS = [".azw", ".mobi", ".prc", ".pobi", ".azw3", ".azw6", ".yj", ".azw1", ".tpz", ".pdf", ".txt", ".html", ".htm", ".jpg", ".jpeg", ".azw2"]
 
 #-------- Existing Kindle database entries
 def parse_entries(cursor):
@@ -45,7 +45,6 @@ def parse_entries_for_calibre(cursor):
     cursor.execute(SELECT_EBOOK_ENTRIES_FOR_CALIBRE)
     for (uuid, cdeKey) in cursor.fetchall():
         if uuid is not None:
-            # FIXME: Store cdeType for later?
             ebooks[cdeKey] = uuid
 
     return ebooks, collections
@@ -88,7 +87,7 @@ def list_folder_contents():
     return folder_contents
 
 #-------- Kindle database commands
-def is_cc_aware():
+def is_cloud_aware():
     # Check if the device is CloudCollections aware in order to know which fields to pass...
     with open('/etc/prettyversion.txt', 'r') as f:
         prettyversion = f.read()
@@ -114,7 +113,7 @@ def delete_collection_json(coll_uuid):
 
 def insert_new_collection_entry(coll_uuid, title, timestamp):
     locale_lang = locale.getdefaultlocale()[0]
-    if is_cc_aware():
+    if is_cloud_aware():
         return {
                     "insert":
                         {
@@ -176,7 +175,7 @@ def update_ebook_entry_if_in_collection(ebook_uuid, number_of_collections):
             }
 
 def send_post_commands(command):
-    full_command = { "commands": command,"type":"ChangeRequest","id": 1}
+    full_command = { "commands": command, "type": "ChangeRequest", "id": 1 }
     r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
     #print full_command
     #print r.json()
@@ -197,7 +196,7 @@ def actually_update_db(commands, collections_dict):
             ebook_dict[ebook_uuid] += 1
 
     # No-op on non-Cloud Collections aware FW
-    if is_cc_aware():
+    if is_cloud_aware():
         for ebook in ebook_dict.keys():
             commands.append( update_ebook_entry_if_in_collection(ebook, ebook_dict[ebook]) )
 
@@ -241,7 +240,7 @@ def update_kindle_db(cursor, db_ebooks, db_collections, config_tags, complete_re
                     if subcollection not in db_collections.keys():
                         new_coll_uuid = uuid.uuid4()
                         timestamp = int(time.time())
-                        #insert new collection dans Entries
+                        # insert new collection in Entries
                         #TODO: if not top collection, p_isVisibleInHome = 0
                         commands.append( insert_new_collection_entry(new_coll_uuid, subcollection, timestamp) )
                         db_collections[subcollection] = new_coll_uuid
@@ -255,7 +254,7 @@ def update_kindle_db(cursor, db_ebooks, db_collections, config_tags, complete_re
                         else:
                             collections_dict[db_collections[subcollection]] = [eb_uuid]
 
-                    # upper collections, nested inside other collections.
+                    # upper collections, nested inside other collections
                     else:
                         # update collection members: subcollections
                         subcollection_to_collection = list(reversed(collection_hierarchy))[i-1] # verify it exists
@@ -286,15 +285,13 @@ def update_cc_db(complete_rebuild = True, from_json = True):
 
 # Return a cdeType, cdeKey couple from a legacy json hash
 def parse_legacy_hash(legacy_hash):
-    print "legacy_hash: %s" %(legacy_hash)
     if legacy_hash.startswith('#'):
         cdeKey, cdeType = legacy_hash[1:].split('^')
     else:
         # Legacy md5 hash of the full path, there's no cdeType, assume EBOK.
-        # FIXME: Do it properly by getting cdeType from the db, and not the json
+        # NOTE: If we ever need a real cdeType, do it properly by getting it from the db, and not the json
         cdeType = u'EBOK'
         cdeKey = legacy_hash
-    print "cdeType: %s | cdeKey: %s" %(cdeType, cdeKey)
     return cdeType, cdeKey
 
 def update_cc_db_from_calibre_plugin_json(complete_rebuild = True):
@@ -304,9 +301,6 @@ def update_cc_db_from_calibre_plugin_json(complete_rebuild = True):
     db_ebooks, db_collections = parse_entries_for_calibre(c)
     # parse calibre plugin json
     collection_members_uuid = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
-
-    print "db_ebooks: %s" %(db_ebooks)
-    print "collection_members_uuid: %s" %(collection_members_uuid)
 
     commands = []
     if complete_rebuild:
@@ -318,27 +312,21 @@ def update_cc_db_from_calibre_plugin_json(complete_rebuild = True):
     collections_dict = defaultdict(list) # dict [collection uuid] = [ ebook uuids, ]
 
     for collection_label in collection_members_uuid.keys():
-        print "collection_label: %s" %(collection_label)
         # Rebuild our list of items w/ their actual db uuid, instead of the legacy hash
-        print "legacy hash list: %s" %(collection_members_uuid[collection_label])
-        ebook_db_uuid = list()
+        ebook_db_uuids = list()
         for cur_hash in collection_members_uuid[collection_label]:
             cdeType, cdeKey = parse_legacy_hash(cur_hash)
-            # FIXME: Err, just realized we probably don't care about cdeType, unless we run into the very, very highly unlikely possibility of two items with the same cdeKey, but different cdeTypes...
-            # Clean that up, that gets rid of most if not all of my FIXMEs ;).
-            ebook_db_uuid.append(db_ebooks[cdeKey])
-        print "db uuid list: %s" %(ebook_db_uuid)
+            # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
+            ebook_db_uuids.append(db_ebooks[cdeKey])
         if collection_label not in db_collections.keys():
             # create
             new_uuid = uuid.uuid4()
             timestamp = int(time.time())
-            #insert new collection dans Entries
+            # insert new collection in Entries
             commands.append( insert_new_collection_entry(new_uuid, collection_label, timestamp) )
-            collections_dict[new_uuid].extend(ebook_db_uuid)
-            print "Insert items %s in new collection %s" %(ebook_db_uuid, new_uuid)
+            collections_dict[new_uuid].extend(ebook_db_uuids)
         else:
-            collections_dict[db_collections[collection_label]].extend(ebook_db_uuid)
-            print "Insert items %s in collection %s" %(ebook_db_uuid, db_collections[collection_label])
+            collections_dict[db_collections[collection_label]].extend(ebook_db_uuids)
 
     actually_update_db(commands, collections_dict)
 
@@ -379,6 +367,8 @@ if __name__ == "__main__":
         update_cc_db(complete_rebuild = True, from_json = True)
     elif command == "rebuild_from_folders":
         update_cc_db(complete_rebuild = True, from_json = False)
+    elif command == "update_from_calibre_plugin_json":
+        update_cc_db_from_calibre_plugin_json(complete_rebuild = False)
     elif command == "rebuild_from_calibre_plugin_json":
         update_cc_db_from_calibre_plugin_json(complete_rebuild = True)
     elif command == "export":
