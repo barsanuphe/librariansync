@@ -1,11 +1,13 @@
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import subprocess, json, os, uuid, sys, shutil, codecs
+import subprocess, json, os, uuid, sys, shutil, codecs, re, syslog
 import sqlite3
 from collections import defaultdict
 
 from cc_update import CCUpdate
 from kindle_contents import *
+from kindle_logging import *
 
 #-------- Config
 KINDLE_DB_PATH =        "/var/local/cc.db"
@@ -52,10 +54,12 @@ def parse_config(config_file):
 
 def parse_calibre_plugin_config(config_file):
     calibre_plugin_config = json.load(open(config_file, 'r'), 'utf8')
-    collection_names = [el.split("@")[0] for el in calibre_plugin_config.keys()]
+    # Handle the locale properly (it might not be here, or the collection name might contain an @, so split doesn't cut it). RegEx borrowed from the KCP.
+    coll_name_pattern = re.compile(r'^(.*)@[^@]+$')
+    collection_names = [coll_name_pattern.sub(r'\1', el) for el in calibre_plugin_config.keys()]
     collection_members_uuid = defaultdict(list) # collection_label: [ebook_uuid, ...]
     for collection in calibre_plugin_config.keys():
-        collection_members_uuid[collection.split("@")[0]].extend( calibre_plugin_config[collection]["items"])
+        collection_members_uuid[coll_name_pattern.sub(r'\1', collection)].extend( calibre_plugin_config[collection]["items"])
     return collection_members_uuid
 
 def update_lists_from_librarian_json(db_ebooks, db_collections, collection_contents):
@@ -83,6 +87,17 @@ def update_lists_from_librarian_json(db_ebooks, db_collections, collection_conte
 
     return db_ebooks, db_collections
 
+# Return a cdeType, cdeKey couple from a legacy json hash
+def parse_legacy_hash(legacy_hash): #TODO: legacy hash from calibre plugin json
+    if legacy_hash.startswith('#'):
+        cdeKey, cdeType = legacy_hash[1:].split('^')
+    else:
+        # Legacy md5 hash of the full path, there's no cdeType, assume EBOK.
+        # NOTE: If we ever need a real cdeType, do it properly by getting it from the db, and not the json
+        cdeType = u'EBOK'
+        cdeKey = legacy_hash
+    return cdeType, cdeKey
+
 def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_contents):
 
     for (collection_label, ebook_uuids_list) in collection_contents.items():
@@ -93,10 +108,12 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
             db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
             collection_idx = len(db_collections)-1
         for ebook_uuid in ebook_uuids_list:
-            #find ebook by location
+            cdeType, ebook_uuid = parse_legacy_hash(ebook_uuid)
+            # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
+            #find ebook by uuid
             ebook_idx = find_ebook(db_ebooks, ebook_uuid)
             if ebook_idx == -1:
-                print("Invalid location", ebook_location)
+                print("Invalid uuid", ebook_uuid)
                 continue # invalid
             # udpate ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
@@ -172,19 +189,40 @@ def export_existing_collections(c):
     with codecs.open(CALIBRE_PLUGIN_FILE, "w", "utf8") as export_json:
         export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
 
+def delete_all_collections(c):
+    # build dictionaries of ebooks/collections with their uuids
+    db_ebooks, db_collections = parse_entries(c)
+
+    # object that will handle all db updates
+    cc = CCUpdate()
+    for collection in db_collections:
+        cc.delete_collection(collection.uuid)
+    cc.execute()
+
 #-------------------------------------------------------
 
 if __name__ == "__main__":
     command = sys.argv[1]
-    cc_db = sqlite3.connect(KINDLE_DB_PATH)
-    c = cc_db.cursor()
-    if command == "add":
-        update_cc_db(c, complete_rebuild = False, source = "librarian")
-    elif command == "rebuild":
-        update_cc_db(c, complete_rebuild = True, source = "librarian")
-    elif command == "rebuild_from_folders":
-        update_cc_db(c, complete_rebuild = True, source = "folders")
-    elif command == "rebuild_from_calibre_plugin_json":
-        update_cc_db(c, complete_rebuild = True, source = "calibre_plugin")
-    elif command == "export":
-        export_existing_collections(c)
+    with sqlite3.connect(KINDLE_DB_PATH) as cc_db:
+        c = cc_db.cursor()
+        if command == "add":
+            kh_msg("Updating collections (librarian) . . .", 'I', 'v')
+            update_cc_db(c, complete_rebuild = False, source = "librarian")
+        elif command == "rebuild":
+            kh_msg("Rebuilding collections (librarian) . . .", 'I', 'v')
+            update_cc_db(c, complete_rebuild = True, source = "librarian")
+        elif command == "rebuild_from_folders":
+            kh_msg("Rebuilding collections (directory structure) . . .", 'I', 'v')
+            update_cc_db(c, complete_rebuild = True, source = "folders")
+        elif command == "rebuild_from_calibre_plugin_json":
+            kh_msg("Rebuilding collections (Calibre) . . .", 'I', 'v')
+            update_cc_db(c, complete_rebuild = True, source = "calibre_plugin")
+        elif command == "rebuild_from_calibre_plugin_json":
+            kh_msg("Updating collections (Calibre) . . .", 'I', 'v')
+            update_cc_db(c, complete_rebuild = False, source = "calibre_plugin")
+        elif command == "export":
+            kh_msg("Exporting collections . . .", 'I', 'v')
+            export_existing_collections(c)
+        elif command == "delete":
+            kh_msg("Deleting all collections . . .", 'I', 'v')
+            delete_all_collections(c)

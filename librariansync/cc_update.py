@@ -1,6 +1,8 @@
 import requests
 import time, json, locale
 
+from kindle_logging import *
+
 def is_cc_aware():
     # Check if the device is CloudCollections aware in order to know which fields to pass...
     with open('/etc/prettyversion.txt', 'r') as f:
@@ -84,6 +86,7 @@ class CCUpdate(object):
                 } )
 
     def execute(self):
+        kh_msg("Sending commands to the framework . . .", 'I', 'v')
         full_command = { "commands" : self.commands, "type" : "ChangeRequest", "id" : 1 }
         r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
         #print full_command

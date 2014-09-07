@@ -9,6 +9,7 @@
 #TODO: try to query google books too
 #TODO: when querying by series, order by series_index
 #TODO: wanted list support for multiple books for each author
+#TODO: build-librariansync-bin should also update confix.xml
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile

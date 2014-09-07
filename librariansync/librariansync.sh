@@ -158,7 +158,7 @@ case "${1}" in
 	"export" )
 		generate_collections "${1}"
 	;;
-        "delete" )
+    "delete" )
 		generate_collections "${1}"
 	;;
 	* )
