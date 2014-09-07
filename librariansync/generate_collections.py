@@ -110,12 +110,12 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
         for ebook_uuid in ebook_uuids_list:
             cdeType, ebook_uuid = parse_legacy_hash(ebook_uuid)
             # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
-            #find ebook by uuid
+            # find ebook by uuid
             ebook_idx = find_ebook(db_ebooks, ebook_uuid)
             if ebook_idx == -1:
                 print("Invalid uuid", ebook_uuid)
                 continue # invalid
-            # udpate ebook
+            # update ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
             # update collection
             db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
@@ -218,7 +218,7 @@ if __name__ == "__main__":
             elif command == "rebuild_from_calibre_plugin_json":
                 kh_msg("Rebuilding collections (Calibre) . . .", 'I', 'v')
                 update_cc_db(c, complete_rebuild = True, source = "calibre_plugin")
-            elif command == "rebuild_from_calibre_plugin_json":
+            elif command == "update_from_calibre_plugin_json":
                 kh_msg("Updating collections (Calibre) . . .", 'I', 'v')
                 update_cc_db(c, complete_rebuild = False, source = "calibre_plugin")
             elif command == "export":
