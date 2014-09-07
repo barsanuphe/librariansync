@@ -1,46 +1,50 @@
 # -*- coding: utf-8 -*-
 
-import subprocess, json, os, uuid, time, sys, shutil, locale, codecs
-import sqlite3, requests
+import subprocess, json, os, uuid, sys, shutil, codecs
+import sqlite3
 from collections import defaultdict
 
+from cc_update import CCUpdate
+from kindle_contents import *
+
 #-------- Config
-KINDLE_DB_PATH = "/var/local/cc.db"
-TAGS = "../collections.json"
-CALIBRE_PLUGIN_FILE = "../calibre_plugin.json"
-EXPORT = "../exported_collections.json"
-KINDLE_EBOOKS_ROOT = "/mnt/us/documents/"
+KINDLE_DB_PATH =        "/var/local/cc.db"
+TAGS =                  "../collections.json"
+CALIBRE_PLUGIN_FILE =   "/mnt/us/system/collections.json"
+EXPORT =                "../exported_collections.json"
+KINDLE_EBOOKS_ROOT =    "/mnt/us/documents/"
 
-SELECT_COLLECTION_ENTRIES =     'select p_uuid, p_titles_0_nominal          from Entries where p_type = "Collection"'
-SELECT_EBOOK_ENTRIES =          'select p_uuid, p_location                  from Entries where p_type = "Entry:Item"'
-SELECT_EXISTING_COLLECTIONS =   'select i_collection_uuid, i_member_uuid    from Collections'
-
-SUPPORTED_EXTENSIONS = [".azw", ".mobi", ".prc", ".pobi", ".azw3", ".azw6", ".yj", ".azw1", ".tpz", ".pdf", ".txt", ".html", ".htm", ".jpg", ".jpeg"]
+SELECT_COLLECTION_ENTRIES =    'select p_uuid, p_titles_0_nominal          from Entries where p_type = "Collection"'
+SELECT_EBOOK_ENTRIES =         'select p_uuid, p_location, p_cdeKey        from Entries where p_type = "Entry:Item"'
+SELECT_EXISTING_COLLECTIONS =  'select i_collection_uuid, i_member_uuid    from Collections'
 
 #-------- Existing Kindle database entries
 def parse_entries(cursor):
-    ebooks = {}
-    collections = {}
+    db_ebooks = []
+    db_collections = []
 
     cursor.execute(SELECT_COLLECTION_ENTRIES)
     for (uuid, label) in cursor.fetchall():
-        collections[label] = uuid
+        db_collections.append(Collection(uuid, label))
 
     cursor.execute(SELECT_EBOOK_ENTRIES)
-    for (uuid, label) in cursor.fetchall():
-        if label is not None:
-            ebooks[label] = uuid
+    for (uuid, location, cdekey) in cursor.fetchall():
+        # only consider user ebooks
+        if location is not None and KINDLE_EBOOKS_ROOT in location:
+            db_ebooks.append(Ebook(uuid, location, cdekey))
 
-    return ebooks, collections
+    cursor.execute(SELECT_EXISTING_COLLECTIONS)
+    for (collection_uuid, ebook_uuid) in cursor.fetchall():
+        collection_idx = find_collection(db_collections, collection_uuid)
+        ebook_idx = find_ebook(db_ebooks, ebook_uuid)
+        if collection_idx != -1 and ebook_idx != -1:
+            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
+            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
 
-def parse_existing_collections(c):
-    existing_collections = defaultdict(list)
+    # remove empty collections:
+    db_collections = [c for c in db_collections if len(c.ebooks) != 0]
 
-    c.execute(SELECT_EXISTING_COLLECTIONS)
-    for (collection_uuid, ebook_uuid) in c.fetchall():
-        existing_collections[collection_uuid].append(ebook_uuid)
-
-    return existing_collections
+    return db_ebooks, db_collections
 
 #-------- JSON collections
 def parse_config(config_file):
@@ -54,249 +58,126 @@ def parse_calibre_plugin_config(config_file):
         collection_members_uuid[collection.split("@")[0]].extend( calibre_plugin_config[collection]["items"])
     return collection_members_uuid
 
-#-------- Folders
-def get_relative_path(path):
-    if isinstance(path, str):
-        return path.split(KINDLE_EBOOKS_ROOT)[1].decode("utf8")
-    else:
-        return path.split(KINDLE_EBOOKS_ROOT)[1]
+def update_lists_from_librarian_json(db_ebooks, db_collections, collection_contents):
 
-def list_folder_contents():
-    folder_contents = {}
-    for root, dirs, files in os.walk(KINDLE_EBOOKS_ROOT):
-        for f in [ get_relative_path(os.path.join(root, el)) for el in files if os.path.splitext(el.lower())[1] in SUPPORTED_EXTENSIONS]:
-            # if not directly in KINDLE_EBOOKS_ROOT
-            if get_relative_path(root) != u"":
-                folder_contents[f] = [get_relative_path(root)]
-    return folder_contents
+    for (ebook_location, ebook_collection_labels_list) in collection_contents.items():
+        #find ebook by location
+        ebook_idx = find_ebook(db_ebooks, os.path.join(KINDLE_EBOOKS_ROOT,ebook_location))
+        if ebook_idx == -1:
+            print("Invalid location", ebook_location)
+            continue # invalid
+        for collection_label in ebook_collection_labels_list:
+            # find collection by label
+            collection_idx = find_collection(db_collections, collection_label)
+            if collection_idx == -1:
+                # creating new collection object
+                db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
+                collection_idx = len(db_collections)-1
+            # udpate ebook
+            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
+            # update collection
+            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
 
-#-------- Kindle database commands
-def delete_collection_json(coll_uuid):
-    return  {
-                "delete":
-                    {
-                        "uuid": coll_uuid
-                    }
-            }
+    # remove empty collections:
+    db_collections = [c for c in db_collections if len(c.ebooks) != 0]
 
-def insert_new_collection_entry(coll_uuid, title, timestamp):
-    locale_lang = locale.getdefaultlocale()[0]
-    return {
-                "insert":
-                    {
-                        "type": "Collection",
-                        "uuid": str(coll_uuid),
-                        "lastAccess": timestamp,
-                        "titles": [
-                                    {
-                                        "display": title,
-                                        "direction": "LTR",
-                                        "language": locale_lang
-                                    }
-                                ],
-                        "isVisibleInHome": 1,
-                        "isArchived": 0,
-                        "collections": None,
-                        "collectionCount": None,
-                        "collectionDataSetName": str(coll_uuid)
-                    }
-             }
+    return db_ebooks, db_collections
 
-def update_collections_entry(coll_uuid, members):
-    return  {
-                "update":
-                    {
-                        "type": "Collection",
-                        "uuid": str(coll_uuid),
-                        "members": members
-                    }
-            }
+def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_contents):
 
-def update_ebook_entry_if_in_collection(ebook_uuid, number_of_collections):
-    return  {
-                "update":
-                    {
-                        "type": "Entry:Item",
-                        "uuid": str(ebook_uuid),
-                        "collectionCount": number_of_collections
-                    }
-            }
+    for (collection_label, ebook_uuids_list) in collection_contents.items():
+        # find collection by label
+        collection_idx = find_collection(db_collections, collection_label)
+        if collection_idx == -1:
+            # creating new collection object
+            db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
+            collection_idx = len(db_collections)-1
+        for ebook_uuid in ebook_uuids_list:
+            #find ebook by location
+            ebook_idx = find_ebook(db_ebooks, ebook_uuid)
+            if ebook_idx == -1:
+                print("Invalid location", ebook_location)
+                continue # invalid
+            # udpate ebook
+            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
+            # update collection
+            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
 
-def send_post_commands(command):
-    full_command = { "commands": command,"type":"ChangeRequest","id": 1}
-    r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
-    #print full_command
-    #print r.json()
+    # remove empty collections:
+    db_collections = [c for c in db_collections if len(c.ebooks) != 0]
 
-#-------- Kindle database update
-def actually_update_db(commands, collections_dict):
-
-    # update all 'Collections' entries with new members
-    for coll in collections_dict.keys():
-        commands.append(update_collections_entry(coll, collections_dict[coll]) )
-
-    # update all Item:Ebook entries that are in at least one Collection,
-    # with the number of collections it belongs to.
-    ebook_dict = defaultdict(lambda: 0) # { uuid: number_of_collections }
-    for coll in collections_dict.keys():
-        ebook_uuids = collections_dict[coll]
-        for ebook_uuid in ebook_uuids:
-            ebook_dict[ebook_uuid] += 1
-
-    for ebook in ebook_dict.keys():
-        commands.append( update_ebook_entry_if_in_collection(ebook, ebook_dict[ebook]) )
-
-    # send all the commands to update the database
-    send_post_commands(commands)
-
-def update_kindle_db(cursor, db_ebooks, db_collections, config_tags, complete_rebuild = True):
-    commands = []
-    if complete_rebuild:
-        # remove all previous collections
-        for coll_uuid in db_collections.values():
-            commands.append( delete_collection_json(coll_uuid) )
-        db_collections = {} # raz
-
-        collections_dict = {} # dict [collection uuid] = [ ebook uuids, ]
-    else:
-        collections_dict = parse_existing_collections(cursor)
-
-    for key in config_tags.keys():
-        kindle_path = os.path.join(KINDLE_EBOOKS_ROOT, key)
-
-        if kindle_path in db_ebooks.keys():
-            eb_uuid = db_ebooks[kindle_path]
-            for coll in config_tags[key]:
-
-                # fw 5.4.5.2: nested collections do not work
-                # Top collections on Kindle Home are shown,
-                # but the subcollections are invisible
-
-                #if '/' in coll:
-                #    collection_hierarchy = coll.split("/")
-                #else:
-                #    collection_hierarchy = [coll]
-
-                # disabling nested collections for the moment...
-                collection_hierarchy = [coll]
-
-                # nested collections
-                for (i,subcollection) in enumerate(reversed(collection_hierarchy)):
-                    # create Collection if necessary
-                    if subcollection not in db_collections.keys():
-                        new_coll_uuid = uuid.uuid4()
-                        timestamp = int(time.time())
-                        #insert new collection dans Entries
-                        #TODO: if not top collection, p_isVisibleInHome = 0
-                        commands.append( insert_new_collection_entry(new_coll_uuid, subcollection, timestamp) )
-                        db_collections[subcollection] = new_coll_uuid
-
-                    # lowest collection, directly associated with ebook uuid
-                    if i == 0:
-                        # update collection members: ebooks
-                        if db_collections[subcollection] in collections_dict.keys():
-                            if eb_uuid not in collections_dict[db_collections[subcollection]]:
-                                collections_dict[db_collections[subcollection]].append(eb_uuid)
-                        else:
-                            collections_dict[db_collections[subcollection]] = [eb_uuid]
-
-                    # upper collections, nested inside other collections.
-                    else:
-                        # update collection members: subcollections
-                        subcollection_to_collection = list(reversed(collection_hierarchy))[i-1] # verify it exists
-                        subcollection_to_collection_uuid = collections_dict[db_collections[subcollection_to_collection]] #TODO: verify if it exists
-
-                        if db_collections[subcollection] in collections_dict.keys():
-                            if subcollection_to_collection_uuid not in collections_dict[db_collections[subcollection]]:
-                                collections_dict[db_collections[subcollection]].append(subcollection_to_collection_uuid)
-                        else:
-                            collections_dict[db_collections[subcollection]] = [subcollection_to_collection_uuid]
-
-    actually_update_db(commands, collections_dict)
+    return db_ebooks, db_collections
 
 #-------- Main
-def update_cc_db(complete_rebuild = True, from_json = True):
-    cc_db = sqlite3.connect(KINDLE_DB_PATH)
-    c = cc_db.cursor()
+def update_cc_db(c, complete_rebuild = True, source = "folders"):
     # build dictionaries of ebooks/collections with their uuids
     db_ebooks, db_collections = parse_entries(c)
-    if from_json:
-        # parse tags json
-        collections_contents = parse_config(TAGS)
-    else:
-        # parse folder structure
-        collections_contents = list_folder_contents()
-    # update kindle db accordingly
-    update_kindle_db(c, db_ebooks, db_collections, collections_contents, complete_rebuild)
 
-def update_cc_db_from_calibre_plugin_json(complete_rebuild = True):
-    cc_db = sqlite3.connect(KINDLE_DB_PATH)
-    c = cc_db.cursor()
-    # build dictionaries of ebooks/collections with their uuids
-    db_ebooks, db_collections = parse_entries(c)
-    # parse calibre plugin json
-    collection_members_uuid = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
+    # object that will handle all db updates
+    cc = CCUpdate()
 
-    commands = []
     if complete_rebuild:
-        # remove all previous collections
-        for coll_uuid in db_collections.values():
-            commands.append( delete_collection_json(coll_uuid) )
-        db_collections = {} # raz
+        # clear all current collections
+        for (i, eb) in enumerate(db_ebooks):
+            db_ebooks[i].collections = []
+        for (i, eb) in enumerate(db_collections):
+            db_collections[i].ebooks = []
+        for collection in db_collections:
+            cc.delete_collection(collection.uuid)
+        db_collections = []
 
-    collections_dict = defaultdict(list) # dict [collection uuid] = [ ebook uuids, ]
-
-    for collection_label in collection_members_uuid.keys():
-        if collection_label not in db_collections.keys():
-            # create
-            new_uuid = uuid.uuid4()
-            timestamp = int(time.time())
-            #insert new collection dans Entries
-            commands.append( insert_new_collection_entry(new_uuid, collection_label, timestamp) )
-            collections_dict[new_uuid].extend(collection_members_uuid[collection_label])
+    if source == "calibre_plugin":
+        collections_contents = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
+        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collections_contents)
+    else:
+        if source == "folders":
+            # parse folder structure
+            collections_contents = list_folder_contents()
         else:
-            collections_dict[db_collections[collection_label]].extend(collection_members_uuid[collection_label])
+            # parse tags json
+            collections_contents = parse_config(TAGS)
+        db_ebooks, db_collections = update_lists_from_librarian_json(db_ebooks, db_collections, collections_contents)
 
-    actually_update_db(commands, collections_dict)
+    # updating collections, creating them if necessary
+    for collection in db_collections:
+        if collection.is_new:
+            # create new collections in db
+            cc.insert_new_collection_entry(collection.uuid, collection.label)
+        # update all 'Collections' entries with new members
+        cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
 
-def export_existing_collections():
-    cc_db = sqlite3.connect(KINDLE_DB_PATH)
-    c = cc_db.cursor()
-    # build dictionaries of ebooks/collections with their uuids
+    # if firmware requires updating ebook entries
+    if cc.is_cc_aware:
+        # update all Item:Ebook entries with the number of collections it belongs to.
+        for ebook in db_ebooks:
+            cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
+
+    # send all the commands to update the database
+    cc.execute()
+
+def export_existing_collections(c):
     db_ebooks, db_collections = parse_entries(c)
-    # dict [ebook_location] = ebook_uuid
-    # dict [collection_label] = collection_uuid
 
-    # dict [ebook_uuid] = ebook_location
-    inverted_db_ebooks = {v: k for k, v in db_ebooks.iteritems()}
-    # dict [collection_uuid] = collection_label
-    inverted_db_collections = {v: k for k, v in db_collections.iteritems()}
+    export = {}
+    for ebook in db_ebooks:
+        export.update(ebook.to_librarian_json())
 
-    # dict [collection uuid] = [ ebook uuids, ]
-    collections_dict = parse_existing_collections(c)
-    labels_collections_dict = defaultdict(list) # dict [collection_label] = [ebook locations, ]
-    for collection_uuid in collections_dict.keys():
-        if collection_uuid in inverted_db_collections.keys():
-            labels_collections_dict[inverted_db_collections[collection_uuid]].extend([inverted_db_ebooks[ebook_uuid] for ebook_uuid in collections_dict[collection_uuid] if ebook_uuid in inverted_db_ebooks.keys()])
+    with codecs.open(EXPORT, "w", "utf8") as export_json:
+        export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
 
-    export = defaultdict(list) # dict [ebook_location] = [ collection_label ]
-    for collection_label, ebook_location_list in labels_collections_dict.items():
-        for ebook_location in ebook_location_list:
-            export[get_relative_path(ebook_location)].append(collection_label)
-
-    export_json = codecs.open(EXPORT, "w", "utf8")
-    export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
-    export_json.close()
+#-------------------------------------------------------
 
 if __name__ == "__main__":
     command = sys.argv[1]
+    cc_db = sqlite3.connect(KINDLE_DB_PATH)
+    c = cc_db.cursor()
     if command == "add":
-        update_cc_db(complete_rebuild = False, from_json = True)
+        update_cc_db(c, complete_rebuild = False, source = "librarian")
     elif command == "rebuild":
-        update_cc_db(complete_rebuild = True, from_json = True)
+        update_cc_db(c, complete_rebuild = True, source = "librarian")
     elif command == "rebuild_from_folders":
-        update_cc_db(complete_rebuild = True, from_json = False)
+        update_cc_db(c, complete_rebuild = True, source = "folders")
     elif command == "rebuild_from_calibre_plugin_json":
-        update_cc_db_from_calibre_plugin_json(complete_rebuild = True)
+        update_cc_db(c, complete_rebuild = True, source = "calibre_plugin")
     elif command == "export":
-        export_existing_collections()
+        export_existing_collections(c)

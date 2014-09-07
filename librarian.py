@@ -8,7 +8,6 @@
 #TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
 #TODO: try to query google books too
 #TODO: when querying by series, order by series_index
-#TODO: when displaying lists/info, json mode?
 #TODO: wanted list support for multiple books for each author
 
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
