@@ -101,10 +101,18 @@ def parse_legacy_hash(legacy_hash):
         cdetype = u'EBOK'
     return cdekey, cdetype
 
-def update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, collection_contents, complete_rebuild):
+def update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, actual_db_collections, collection_contents, complete_rebuild):
     for (collection_label, ebook_hashes_list) in collection_contents.items():
         # find collection by label
-        collection_idx = find_collection(db_collections, collection_label)
+        if complete_rebuild:
+            collection_idx = find_collection(db_collections, collection_label)
+        else:
+            collection_idx = find_collection(actual_db_collections, collection_label)
+            if collection_idx != -1:
+                # Recreate that collection object from the real data, but with an empty book list
+                db_collections.append(Collection(actual_db_collections[collection_idx].uuid, collection_label, is_new = False))
+                # And then tweak the pointer properly
+                collection_idx = len(db_collections)-1
         if collection_idx == -1:
             # creating new collection object
             db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
@@ -152,7 +160,7 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
             actual_db_ebooks =  []
     else:
         if source == "calibre_plugin":
-            # Keep a copy of the real db data to handle our diff'ing...
+            # keep a copy of the real db data to handle our diff'ing...
             actual_db_collections = copy.deepcopy(db_collections)
             actual_db_ebooks = copy.deepcopy(db_ebooks)
             # forget about the actual db as our main pool of data
@@ -160,11 +168,12 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
                 db_ebooks[i].collections = []
             for (i, eb) in enumerate(db_collections):
                 db_collections[i].ebooks = []
+            # Why? Because we can't just pass the new members of a collection to ccat, we have to pass the full members list, so this ends up being an okayish shortcut...
             db_collections = []
 
     if source == "calibre_plugin":
         collections_contents = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
-        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, collections_contents, complete_rebuild)
+        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, actual_db_collections, collections_contents, complete_rebuild)
     else:
         if source == "folders":
             # parse folder structure
@@ -173,15 +182,6 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
             # parse tags json
             collections_contents = parse_config(TAGS)
         db_ebooks, db_collections = update_lists_from_librarian_json(db_ebooks, db_collections, collections_contents)
-
-    # handle the particulars of the calibre incremental format
-    if not complete_rebuild and source == "calibre_plugin":
-        for collection in db_collections:
-            if collection.is_new:
-                # Since we always rebuild collections from scratch, everything will look new. Drop old duplicates first!
-                collection_idx = find_collection(actual_db_collections, collection.label)
-                if collection_idx != -1:
-                    cc.delete_collection(actual_db_collections[collection_idx].uuid)
 
     # updating collections, creating them if necessary
     for collection in db_collections:
