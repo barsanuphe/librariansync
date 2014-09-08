@@ -101,11 +101,7 @@ def parse_legacy_hash(legacy_hash):
         cdetype = u'EBOK'
     return cdekey, cdetype
 
-def update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, actual_db_collections, collection_contents, complete_rebuild):
-    # if we're doing an incremental update, forget about the actual db
-    if not complete_rebuild:
-        db_collections = []
-
+def update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, collection_contents, complete_rebuild):
     for (collection_label, ebook_hashes_list) in collection_contents.items():
         # find collection by label
         collection_idx = find_collection(db_collections, collection_label)
@@ -151,16 +147,24 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
         for collection in db_collections:
             cc.delete_collection(collection.uuid)
         db_collections = []
-        actual_db_collections = []
-        actual_db_ebooks =  []
+        if source == "calibre_plugin":
+            actual_db_collections = []
+            actual_db_ebooks =  []
     else:
-        # Keep a copy of the real db to handle our diff'ing...
-        actual_db_collections = copy.deepcopy(db_collections)
-        actual_db_ebooks = copy.deepcopy(db_ebooks)
+        if source == "calibre_plugin":
+            # Keep a copy of the real db to handle our diff'ing...
+            actual_db_collections = copy.deepcopy(db_collections)
+            actual_db_ebooks = copy.deepcopy(db_ebooks)
+            # forget about the actual db as our main pool of data
+            for (i, eb) in enumerate(db_ebooks):
+                db_ebooks[i].collections = []
+            for (i, eb) in enumerate(db_collections):
+                db_collections[i].ebooks = []
+            db_collections = []
 
     if source == "calibre_plugin":
         collections_contents = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
-        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, actual_db_collections, collections_contents, complete_rebuild)
+        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, collections_contents, complete_rebuild)
     else:
         if source == "folders":
             # parse folder structure
@@ -172,42 +176,14 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
 
     # if this is a calibre incremental update, don't even send commands for what hasn't changed
     if not complete_rebuild and source == "calibre_plugin":
-        updated_db_collections = []
         for collection in db_collections:
             if collection.is_new:
-                updated_db_collections.append(collection)
-                print "Collection {} is new or updated\n".format(collection.uuid)
+                print "Collection {} is new or updated".format(collection.uuid)
                 # Since we always rebuild collections from scratch, everything will look new. Drop old duplicates first!
                 collection_idx = find_collection(actual_db_collections, collection.label)
                 if collection_idx != -1:
-                    print "Drop previous collection version {}\n".format(actual_db_collections[collection_idx].uuid)
+                    print "Drop previous collection version {}".format(actual_db_collections[collection_idx].uuid)
                     cc.delete_collection(actual_db_collections[collection_idx].uuid)
-            else:
-                collection_idx = find_collection(db_collections, collection.uuid)
-                # drop the duplicates we got from update_lists_from_calibre_plugin_json....
-                actual_db_uuids = [e.uuid for e in actual_db_collections[collection_idx].ebooks]
-                mangled_uuids = [e.uuid for e in collection.ebooks]
-                #updated_ebooks = [mangled_uuids.remove(x) for x in actual_db_uuids]
-                #for x in actual_db_uuids:
-                #    mangled_uuids.remove(x)
-                #print "mangled_uuids: {}\n".format(mangled_uuids)
-
-                print "diff: {}\n".format(set(mangled_uuids).symmetric_difference(set(actual_db_uuids)))
-                if set(mangled_uuids).symmetric_difference(set(actual_db_uuids)):
-                    # even when not doing a complete rebuild, we'll need to rebuild this updated collection from scratch,
-                    # in order to avoid duplicate members in the SQL Collection db entry (and a bogus item count on at least non-cc-aware FW)...
-                    cc.delete_collection(collection.uuid)
-                    collection.is_new = True
-                    # Change its uuid to avoid Catalog shenanigans...
-                    collection.uuid = uuid.uuid4()
-                    updated_db_collections.append(collection)
-                    print "Collection {} was updated, rebuild it from scratch\n".format(collection.uuid)
-        # Use the diffed db ;)
-        if updated_db_collections:
-            db_collections = updated_db_collections
-        else:
-            # if there were no changes, don't do anything. Importing the same db twice without the safety cleanups of a rebuild is prone to issues
-            db_collections = []
 
     # Make sure the deletes are executed first, to avoid Catalog shenanigans when updating an existing collection...
     cc.execute()
@@ -220,7 +196,7 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
         if collection.is_new:
             # create new collections in db
             cc.insert_new_collection_entry(collection.uuid, collection.label)
-        print "collection.ebooks: {}\n".format([e.uuid for e in collection.ebooks])
+        print "collection.ebooks: {}".format([e.uuid for e in collection.ebooks])
         cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
 
     # if firmware requires updating ebook entries

@@ -90,7 +90,7 @@ class CCUpdate(object):
         log(LIBRARIAN_SYNC, "cc_update", "Sending commands...")
         self.req_id+=1
         full_command = { "commands" : self.commands, "type" : "ChangeRequest", "id" : self.req_id }
-        print "full_command: {}\n".format(full_command)
+        print "full_command: {}".format(full_command)
         r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
         if r.json()[u"ok"]:
             log(LIBRARIAN_SYNC, "cc_update", "Success.")
