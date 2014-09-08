@@ -101,7 +101,7 @@ def parse_legacy_hash(legacy_hash):
         cdetype = u'EBOK'
     return cdekey, cdetype
 
-def update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, actual_db_collections, collection_contents, complete_rebuild):
+def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, actual_db_collections, collection_contents, complete_rebuild):
     for (collection_label, ebook_hashes_list) in collection_contents.items():
         # find collection by label
         if complete_rebuild:
@@ -121,10 +121,7 @@ def update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collec
             cdekey, cdetype = parse_legacy_hash(ebook_hash)
             # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
             # find ebook by cdeKey
-            if complete_rebuild:
-                ebook_idx = find_ebook(db_ebooks, cdekey)
-            else:
-                ebook_idx = find_ebook(actual_db_ebooks, cdekey)
+            ebook_idx = find_ebook(db_ebooks, cdekey)
             if ebook_idx == -1:
                 print "Couldn't match a db uuid to cdeKey {} (book not on device?)".format(cdekey)
                 continue # invalid
@@ -157,12 +154,10 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
         db_collections = []
         if source == "calibre_plugin":
             actual_db_collections = []
-            actual_db_ebooks =  []
     else:
         if source == "calibre_plugin":
             # keep a copy of the real db data to handle our diff'ing...
             actual_db_collections = copy.deepcopy(db_collections)
-            actual_db_ebooks = copy.deepcopy(db_ebooks)
             # forget about the actual db as our main pool of data
             for (i, eb) in enumerate(db_ebooks):
                 db_ebooks[i].collections = []
@@ -173,7 +168,7 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
 
     if source == "calibre_plugin":
         collections_contents = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
-        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, actual_db_collections, collections_contents, complete_rebuild)
+        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, db_collections, actual_db_collections, collections_contents, complete_rebuild)
     else:
         if source == "folders":
             # parse folder structure
