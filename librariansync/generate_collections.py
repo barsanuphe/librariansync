@@ -199,13 +199,11 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
                 cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
             else:
                 # incremental update, only update books whose collections have changed
-                # FIXME?: Test me! :D
                 do_update = False
                 for collection in ebook.collections:
                     if find_collection(db_collections, collection.uuid) != -1:
                         do_update = True
                 if do_update:
-                    #print "Update collection count for entry {}".format(ebook.uuid)
                     cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
 
     # send all the commands to update the database
