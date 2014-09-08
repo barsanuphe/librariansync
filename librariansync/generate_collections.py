@@ -152,7 +152,7 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
             actual_db_ebooks =  []
     else:
         if source == "calibre_plugin":
-            # Keep a copy of the real db to handle our diff'ing...
+            # Keep a copy of the real db data to handle our diff'ing...
             actual_db_collections = copy.deepcopy(db_collections)
             actual_db_ebooks = copy.deepcopy(db_ebooks)
             # forget about the actual db as our main pool of data
@@ -174,15 +174,13 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
             collections_contents = parse_config(TAGS)
         db_ebooks, db_collections = update_lists_from_librarian_json(db_ebooks, db_collections, collections_contents)
 
-    # if this is a calibre incremental update, don't even send commands for what hasn't changed
+    # handle the particulars of the calibre incremental format
     if not complete_rebuild and source == "calibre_plugin":
         for collection in db_collections:
             if collection.is_new:
-                print "Collection {} is new or updated".format(collection.uuid)
                 # Since we always rebuild collections from scratch, everything will look new. Drop old duplicates first!
                 collection_idx = find_collection(actual_db_collections, collection.label)
                 if collection_idx != -1:
-                    print "Drop previous collection version {}".format(actual_db_collections[collection_idx].uuid)
                     cc.delete_collection(actual_db_collections[collection_idx].uuid)
 
     # updating collections, creating them if necessary
@@ -190,7 +188,7 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
         if collection.is_new:
             # create new collections in db
             cc.insert_new_collection_entry(collection.uuid, collection.label)
-        print "collection.ebooks: {}".format([e.uuid for e in collection.ebooks])
+        # update all 'Collections' entries with new members
         cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
 
     # if firmware requires updating ebook entries
@@ -207,7 +205,7 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
                     if find_collection(db_collections, collection.uuid) != -1:
                         do_update = True
                 if do_update:
-                    print "Update collection count for entry {}".format(ebook.uuid)
+                    #print "Update collection count for entry {}".format(ebook.uuid)
                     cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
 
     # send all the commands to update the database
