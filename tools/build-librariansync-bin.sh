@@ -13,7 +13,14 @@ fi
 
 # create tar.gz
 cp -R ../librariansync .
-tar -zcvf librariansync.tar.gz librariansync/generate_collections.py librariansync/menu.json librariansync/README.md librariansync/config.xml
+tar -zcvf librariansync.tar.gz \
+    librariansync/generate_collections.py \
+    librariansync/menu.json \
+    librariansync/README.md \
+    librariansync/config.xml \
+    librariansync/kindle_contents.py \
+    librariansync/kindle_logging.py \
+    librariansync/cc_update.py
 
 # build the update
 kindletool create ota2 -d ${DEVICE} librariansync.tar.gz install.sh Update_${PKGNAME}_${PKGVER}_${DEVICE}.bin
