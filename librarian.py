@@ -1,26 +1,14 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-#TODO: filename template: support for optional parts (ex: "[$s] [#$i]")
-#TODO: support for several series?
-#TODO: tags == dc:subject list?
-#TODO: auto-correct option (w/author_aliases) + yaml option confirm_before_write
-#TODO: allow syncing without converting to mobi (--sync --kindle would convert and sync)
-#TODO: try to query google books too
-#TODO: when querying by series, order by series_index
-#TODO: wanted list support for multiple books for each author
-#TODO: build-librariansync-bin should also update confix.xml
-
 from __future__ import print_function #so that parsing this with python2 does not raise SyntaxError
 import os, subprocess, shutil, sys, hashlib, zipfile
 import xml.dom.minidom, codecs
 import time, concurrent.futures, multiprocessing, json, argparse
 
 from librarianlib.epub import Epub, read, not_read, reading
-from librarianlib.ebook_search import EbookSearch, fuzzy_search_in_list
+from librarianlib.ebook_search import *
 from librarianlib.openlibrary_search import OpenLibrarySearch
-
-
 
 if sys.version_info < (3,0,0):
   print("You need python 3.0 or later to run this script.")
@@ -71,7 +59,6 @@ class Library(object):
         self.ebooks = []
         self.backup_imported_ebooks = True
         self.scrape_root = None
-        self.wanted = {}
         self.interactive = False
         self.ebook_filename_template = "$a/$a ($y) $t"
         self.open_config()
@@ -108,8 +95,6 @@ class Library(object):
                 self.backup_imported_ebooks = self.config["backup_imported_ebooks"]
             if "author_aliases" in self.config.keys():
                 AUTHOR_ALIASES = self.config["author_aliases"]
-            if "wanted" in self.config.keys():
-                self.wanted = self.config["wanted"]
             if "interactive" in self.config.keys():
                 self.interactive = self.config["interactive"]
             self.ebook_filename_template = self.config.get("ebook_filename_template", "$a/$a ($y) $t")
@@ -184,18 +169,6 @@ class Library(object):
         for root, dirs, files in os.walk(LIBRARY_DIR, topdown=False):
             for dir in [os.path.join(root, el) for el in dirs if os.listdir( os.path.join(root, el)) == []]:
                 os.rmdir(dir)
-
-        # check if imported ebook was on wishlist
-        if self.wanted != {}:
-            for ebook in self.ebooks:
-                for key in self.wanted.keys():
-                    if fuzzy_search_in_list(key, ebook.metadata.get_values("author")) and fuzzy_search_in_list(self.wanted[key], ebook.metadata.get_values("title")):
-                        print("! Found WANTED ebook: ", ebook )
-                        answer = input("! Confirm this is what you were looking for: %s\ny/n? "%ebook)
-                        if answer.lower() == "y":
-                            print(" -> Removing from wanted list.")
-                            del self.wanted[key]
-                            self.save_config()
 
         is_incomplete = self.list_incomplete_metadata()
         print("Database refreshed in %.2fs."%(time.perf_counter() - start))
@@ -486,21 +459,31 @@ if __name__ == "__main__":
 
             # filtering
             filtered = []
-            s = EbookSearch(l.ebooks)
+            s = Search(l.ebooks, is_exact = False)
+
             if args.collections is not None:
                 if args.collections == "":
-                    all_tags = s.list_tags()
+                    all_tags = list_tags(l.ebooks)
                     for tag in sorted(all_tags.keys()):
                         print(" -> %s (%s)"%(tag, all_tags[tag]))
                 elif args.collections == "untagged":
-                    filtered = s.search([""], ["tag:"], additive = False)
+                    filtered = s.excludes(["tag:"])
+                    filtered = s.run_search(EvaluateMatch.AND)
                 else:
-                    filtered = s.search_ebooks('tag:%s'%args.collections, exact_search = True)
+                    s.is_exact = True
+                    filtered = s.filters(['tag:%s'%args.collections])
+                    filtered = s.run_search(EvaluateMatch.AND)
 
-            if args.filter_ebooks_and is not None:
-                filtered = s.search(args.filter_ebooks_and, args.filter_exclude, additive = True)
-            elif args.filter_ebooks_or is not None:
-                filtered = s.search(args.filter_ebooks_or, args.filter_exclude, additive = False)
+            else:
+                if args.filter_exclude is not None:
+                    s.excludes(args.filter_exclude)
+                if args.filter_ebooks_and is not None:
+                    s.filters(args.filter_ebooks_and)
+                    filtered = s.run_search(EvaluateMatch.AND)
+                elif args.filter_ebooks_or is not None:
+                    s.filters(args.filter_ebooks_or)
+                    filtered = s.run_search(EvaluateMatch.OR)
+
 
             # add/remove tags
             if args.add_tag is not None and filtered != []:
@@ -514,7 +497,6 @@ if __name__ == "__main__":
 
             #print('(', read("read"), not_read("not_read"), reading("reading"), ')')
             for ebook in filtered:
-
                 if args.info is None:
                     print(" -> ", ebook)
                     if args.openlibrary:

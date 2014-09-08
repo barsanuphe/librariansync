@@ -81,8 +81,6 @@ An example configuration would be:
     kindle_root: /run/media/login/Kindle
     library_root: /home/login/ebooks
     scrape_root: /home/login/documents
-    wanted:
-        Harry Harrisson: Make Room! Make Room!
 
 *kindle_root* and *library_root* are mandatory. The rest is optional.
 
@@ -94,9 +92,6 @@ by default '$a/$a ($y) $t'.
 Available information are: *$a* (author), *$y* (year), *$t* (title), *$s* (series),
 *$i* (series_index).
 Refreshing the database automatically applies the template.
-
-The *wanted* option is to be seen as a way to keep a wishlist. Librarian.py will
-remove the entries it finds on import.
 
 **Note**: Only epub ebooks can be added to the library. They are converted to
 mobi while syncing with the Kindle.
