@@ -42,10 +42,18 @@ class Ebook(object):
         self.location = location
         self.cdekey = cdekey
         self.cdetype = cdetype
+        self.original_collections = []
         self.collections = []
 
-    def add_collection(self, collection):
-        self.collections.append(collection)
+    def __eq__(self, other):
+        # comparing uuids should be enough
+        return self.uuid == other.uuid
+
+    def add_collection(self, collection, original = False):
+        if original:
+            self.original_collections.append(collection)
+        else:
+            self.collections.append(collection)
 
     def to_librarian_json(self):
         if self.collections == []:
@@ -57,13 +65,21 @@ class Collection(object):
     def __init__(self, uuid, label, is_new = False):
         self.uuid = uuid
         self.label = label
+        self.original_ebooks = []
         self.ebooks = []
         self.is_new = is_new
 
-    def add_ebook(self, ebook):
-        self.ebooks.append(ebook)
+    def sort_ebooks(self):
+        self.ebooks.sort(key=lambda ebook: ebook.uuid)
+        self.original_ebooks.sort(key=lambda ebook: ebook.uuid)
 
-    # Build a legacy hashes list from the cdeType & cdeKey couple of our book list
+    def add_ebook(self, ebook, original = False):
+        if original:
+            self.original_ebooks.append(ebook)
+        else:
+            self.ebooks.append(ebook)
+
+    # Build a legacy hashes list from the cdeType & cdeKey couples of our book list
     def build_legacy_hashes_list(self):
         hashes_list = []
         for e in self.ebooks:

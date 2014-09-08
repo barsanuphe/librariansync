@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import json, os, uuid, sys, codecs, re
+import json, os, uuid, sys, codecs, re, time, traceback
 import sqlite3
 from collections import defaultdict
 
@@ -41,11 +41,11 @@ def parse_entries(cursor):
         collection_idx = find_collection(db_collections, collection_uuid)
         ebook_idx = find_ebook(db_ebooks, ebook_uuid)
         if collection_idx != -1 and ebook_idx != -1:
-            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
-            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
+            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx], True)
+            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx], True)
 
     # remove empty collections:
-    db_collections = [c for c in db_collections if len(c.ebooks) != 0]
+    db_collections = [c for c in db_collections if len(c.original_ebooks) != 0]
 
     return db_ebooks, db_collections
 
@@ -113,7 +113,7 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
             # find ebook by cdeKey
             ebook_idx = find_ebook(db_ebooks, cdekey)
             if ebook_idx == -1:
-                print("Couldn't match a db uuid to cdeKey %s (book not on device?)", cdekey)
+                print("Couldn't match a db uuid to cdeKey %s (book not on device?)"%cdekey)
                 continue # invalid
             # update ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
@@ -136,9 +136,9 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
     if complete_rebuild:
         # clear all current collections
         for (i, eb) in enumerate(db_ebooks):
-            db_ebooks[i].collections = []
+            db_ebooks[i].original_collections = []
         for (i, eb) in enumerate(db_collections):
-            db_collections[i].ebooks = []
+            db_collections[i].original_ebooks = []
         for collection in db_collections:
             cc.delete_collection(collection.uuid)
         db_collections = []
@@ -161,13 +161,16 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
             # create new collections in db
             cc.insert_new_collection_entry(collection.uuid, collection.label)
         # update all 'Collections' entries with new members
-        cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
+        collection.sort_ebooks()
+        if collection.ebooks != collection.original_ebooks:
+            cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
 
     # if firmware requires updating ebook entries
     if cc.is_cc_aware:
         # update all Item:Ebook entries with the number of collections it belongs to.
         for ebook in db_ebooks:
-            cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
+            if len(ebook.collections) != len(ebook.original_collections):
+                cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
 
     # send all the commands to update the database
     cc.execute()
@@ -204,6 +207,7 @@ def delete_all_collections(c):
 if __name__ == "__main__":
     command = sys.argv[1]
 
+    start = time.time()
     log(LIBRARIAN_SYNC, "main", "Starting...")
     try:
         with sqlite3.connect(KINDLE_DB_PATH) as cc_db:
@@ -235,5 +239,9 @@ if __name__ == "__main__":
     except Exception, e:
         log(LIBRARIAN_SYNC, "main", "Something went very wrong.", "E")
         print e
+        traceback.print_exc()
     else:
-        log(LIBRARIAN_SYNC, "main", "Done.")
+        log(LIBRARIAN_SYNC, "main", "Done in %.02fs."%(time.time()-start))
+        # Take care of buffered IO & KUAL's IO redirection...
+        sys.stdout.flush()
+        sys.stderr.flush()
