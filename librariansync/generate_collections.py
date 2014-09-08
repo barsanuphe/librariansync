@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import json, os, uuid, sys, codecs, re
+import json, os, uuid, sys, codecs, re, copy
 import sqlite3
 from collections import defaultdict
 
@@ -22,7 +22,7 @@ SELECT_EBOOK_ENTRIES =         'select p_uuid, p_location, p_cdeKey, p_cdeType  
 SELECT_EXISTING_COLLECTIONS =  'select i_collection_uuid, i_member_uuid               from Collections'
 
 #-------- Existing Kindle database entries
-def parse_entries(cursor):
+def parse_entries(cursor, ignore_empty_collections = True):
     db_ebooks = []
     db_collections = []
 
@@ -43,9 +43,12 @@ def parse_entries(cursor):
         if collection_idx != -1 and ebook_idx != -1:
             db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
+        else:
+            print "Skipping collection {} (collection_idx: {}, ebook_idx: {})".format(collection_uuid, collection_idx, ebook_idx)
 
     # remove empty collections:
-    db_collections = [c for c in db_collections if len(c.ebooks) != 0]
+    if ignore_empty_collections:
+        db_collections = [c for c in db_collections if len(c.ebooks) != 0]
 
     return db_ebooks, db_collections
 
@@ -99,7 +102,6 @@ def parse_legacy_hash(legacy_hash):
     return cdekey, cdetype
 
 def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_contents):
-
     for (collection_label, ebook_hashes_list) in collection_contents.items():
         # find collection by label
         collection_idx = find_collection(db_collections, collection_label)
@@ -113,7 +115,7 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
             # find ebook by cdeKey
             ebook_idx = find_ebook(db_ebooks, cdekey)
             if ebook_idx == -1:
-                print("Couldn't match a db uuid to cdeKey %s (book not on device?)", cdekey)
+                print "Couldn't match a db uuid to cdeKey {} (book not on device?)".format(cdekey)
                 continue # invalid
             # update ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
@@ -128,7 +130,7 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
 #-------- Main
 def update_cc_db(c, complete_rebuild = True, source = "folders"):
     # build dictionaries of ebooks/collections with their uuids
-    db_ebooks, db_collections = parse_entries(c)
+    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = True)
 
     # object that will handle all db updates
     cc = CCUpdate()
@@ -142,6 +144,9 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
         for collection in db_collections:
             cc.delete_collection(collection.uuid)
         db_collections = []
+    else:
+        # Keep a copy of the real db to handle our diff'ing...
+        actual_db_collections = copy.deepcopy(db_collections)
 
     if source == "calibre_plugin":
         collections_contents = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
@@ -155,25 +160,69 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
             collections_contents = parse_config(TAGS)
         db_ebooks, db_collections = update_lists_from_librarian_json(db_ebooks, db_collections, collections_contents)
 
+    # if this is not a complete rebuild, don't even send commands for what hasn't changed
+    if not complete_rebuild:
+        updated_db_collections = []
+        for collection in db_collections:
+            if collection.is_new:
+                updated_db_collections.append(collection)
+                print "Collection {} is new".format(collection.uuid)
+            else:
+                collection_idx = find_collection(db_collections, collection.uuid)
+                if collection.uuid == u'e49be3a4-fdd4-41ab-8ff0-31c70839eaf0':
+                    print "diff: {}".format(set([e.uuid for e in collection.ebooks]).symmetric_difference(set([e.uuid for e in actual_db_collections[collection_idx].ebooks])))
+                if set([e.uuid for e in collection.ebooks]).symmetric_difference(set([e.uuid for e in actual_db_collections[collection_idx].ebooks])):
+                    updated_db_collections.append(collection)
+                    print "Collection {} was updated".format(collection.uuid)
+        # Use the diffed db ;)
+        if updated_db_collections:
+            db_collections = updated_db_collections
+        else:
+            # if there were no changes, don't do anything. Importing the same db twice without the safety cleanups of a rebuild is prone to issues
+            db_collections = []
+
+
     # updating collections, creating them if necessary
     for collection in db_collections:
         if collection.is_new:
             # create new collections in db
             cc.insert_new_collection_entry(collection.uuid, collection.label)
         # update all 'Collections' entries with new members
-        cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
+        if complete_rebuild:
+            cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
+        else:
+            # if this is not a complete rebuild, only pass *new* members, or you get duplicate members in the Collection db entry (and a bogus item count on at least non-cc-aware FW).
+            # the downside of never dropping books from a collection in this instance is documented.
+            updated_ebooks_uuids = []
+            for e in collection.ebooks:
+                collection_idx = find_collection(actual_db_collections, collection.uuid)
+                if e.uuid not in [ae.uuid for ae in actual_db_collections[collection_idx].ebooks]:
+                    # new members in a collection
+                    print "Add new member {} to collection {}".format(e.uuid, collection.uuid)
+                    updated_ebooks_uuids.append(e.uuid)
+            cc.update_collections_entry(collection.uuid, updated_ebooks_uuids)
 
     # if firmware requires updating ebook entries
     if cc.is_cc_aware:
         # update all Item:Ebook entries with the number of collections it belongs to.
         for ebook in db_ebooks:
-            cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
+            if complete_rebuild:
+                cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
+            else:
+                # incremental update, only update books whose collections have changed
+                do_update = False
+                for collection in ebook.collections:
+                    if find_collection(db_collections, collection.uuid) != -1:
+                        do_update = True
+                if do_update:
+                    print "Update collection count for entry {}".format(ebook.uuid)
+                    cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
 
     # send all the commands to update the database
     cc.execute()
 
 def export_existing_collections(c):
-    db_ebooks, db_collections = parse_entries(c)
+    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = True)
 
     export = {}
     for ebook in db_ebooks:
@@ -191,7 +240,7 @@ def export_existing_collections(c):
 
 def delete_all_collections(c):
     # build dictionaries of ebooks/collections with their uuids
-    db_ebooks, db_collections = parse_entries(c)
+    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = False)
 
     # object that will handle all db updates
     cc = CCUpdate()
@@ -237,3 +286,6 @@ if __name__ == "__main__":
         print e
     else:
         log(LIBRARIAN_SYNC, "main", "Done.")
+        # Take care of buffered IO & KUAL's IO redirection...
+        sys.stdout.flush()
+        sys.stderr.flush()
