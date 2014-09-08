@@ -63,4 +63,4 @@ def log(program, function, msg, level = "I", display = True):
         subprocess.call(['eips', '0', str(EIPS_MAXLINES - 3), program_display], stderr = DEVNULL)
         subprocess.call(['eips', '0', str(EIPS_MAXLINES - 2), displayed], stderr = DEVNULL)
         # to prevent text garbling if two logs were sent too fast
-        time.sleep(0.25)
+        time.sleep(0.15)
