@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import json, os, uuid, sys, codecs, re, copy, time, traceback
+import json, os, uuid, sys, codecs, re, copy, traceback
 import sqlite3
 from collections import defaultdict
 
@@ -185,12 +185,6 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
                     print "Drop previous collection version {}".format(actual_db_collections[collection_idx].uuid)
                     cc.delete_collection(actual_db_collections[collection_idx].uuid)
 
-    # Make sure the deletes are executed first, to avoid Catalog shenanigans when updating an existing collection...
-    cc.execute()
-    cc.commands = []
-    # .. And sleep a bit to avoid bogus item counts when reintroducing collections with identical names than before... >_<"
-    time.sleep(1)
-
     # updating collections, creating them if necessary
     for collection in db_collections:
         if collection.is_new:
@@ -207,6 +201,7 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
                 cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
             else:
                 # incremental update, only update books whose collections have changed
+                # FIXME?: Test me! :D
                 do_update = False
                 for collection in ebook.collections:
                     if find_collection(db_collections, collection.uuid) != -1:

@@ -23,7 +23,6 @@ class CCUpdate(object):
     def __init__(self):
         self.commands = []
         self.is_cc_aware = is_cc_aware()
-        self.req_id = 0
 
     def delete_collection(self, coll_uuid):
         self.commands.append(
@@ -88,8 +87,7 @@ class CCUpdate(object):
 
     def execute(self):
         log(LIBRARIAN_SYNC, "cc_update", "Sending commands...")
-        self.req_id+=1
-        full_command = { "commands" : self.commands, "type" : "ChangeRequest", "id" : self.req_id }
+        full_command = { "commands" : self.commands, "type" : "ChangeRequest", "id" : 1 }
         print "full_command: {}".format(full_command)
         r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
         if r.json()[u"ok"]:
