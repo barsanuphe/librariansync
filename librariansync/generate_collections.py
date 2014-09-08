@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import json, os, uuid, sys, codecs, re, copy
+import json, os, uuid, sys, codecs, re, copy, time, traceback
 import sqlite3
 from collections import defaultdict
 
@@ -101,7 +101,11 @@ def parse_legacy_hash(legacy_hash):
         cdetype = u'EBOK'
     return cdekey, cdetype
 
-def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_contents):
+def update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, actual_db_collections, collection_contents, complete_rebuild):
+    # if we're doing an incremental update, forget about the actual db
+    if not complete_rebuild:
+        db_collections = []
+
     for (collection_label, ebook_hashes_list) in collection_contents.items():
         # find collection by label
         collection_idx = find_collection(db_collections, collection_label)
@@ -113,7 +117,10 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
             cdekey, cdetype = parse_legacy_hash(ebook_hash)
             # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
             # find ebook by cdeKey
-            ebook_idx = find_ebook(db_ebooks, cdekey)
+            if complete_rebuild:
+                ebook_idx = find_ebook(db_ebooks, cdekey)
+            else:
+                ebook_idx = find_ebook(actual_db_ebooks, cdekey)
             if ebook_idx == -1:
                 print "Couldn't match a db uuid to cdeKey {} (book not on device?)".format(cdekey)
                 continue # invalid
@@ -144,13 +151,16 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
         for collection in db_collections:
             cc.delete_collection(collection.uuid)
         db_collections = []
+        actual_db_collections = []
+        actual_db_ebooks =  []
     else:
         # Keep a copy of the real db to handle our diff'ing...
         actual_db_collections = copy.deepcopy(db_collections)
+        actual_db_ebooks = copy.deepcopy(db_ebooks)
 
     if source == "calibre_plugin":
         collections_contents = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
-        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collections_contents)
+        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, actual_db_ebooks, db_collections, actual_db_collections, collections_contents, complete_rebuild)
     else:
         if source == "folders":
             # parse folder structure
@@ -160,20 +170,38 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
             collections_contents = parse_config(TAGS)
         db_ebooks, db_collections = update_lists_from_librarian_json(db_ebooks, db_collections, collections_contents)
 
-    # if this is not a complete rebuild, don't even send commands for what hasn't changed
-    if not complete_rebuild:
+    # if this is a calibre incremental update, don't even send commands for what hasn't changed
+    if not complete_rebuild and source == "calibre_plugin":
         updated_db_collections = []
         for collection in db_collections:
             if collection.is_new:
                 updated_db_collections.append(collection)
-                print "Collection {} is new".format(collection.uuid)
+                print "Collection {} is new or updated\n".format(collection.uuid)
+                # Since we always rebuild collections from scratch, everything will look new. Drop old duplicates first!
+                collection_idx = find_collection(actual_db_collections, collection.label)
+                if collection_idx != -1:
+                    print "Drop previous collection version {}\n".format(actual_db_collections[collection_idx].uuid)
+                    cc.delete_collection(actual_db_collections[collection_idx].uuid)
             else:
                 collection_idx = find_collection(db_collections, collection.uuid)
-                if collection.uuid == u'e49be3a4-fdd4-41ab-8ff0-31c70839eaf0':
-                    print "diff: {}".format(set([e.uuid for e in collection.ebooks]).symmetric_difference(set([e.uuid for e in actual_db_collections[collection_idx].ebooks])))
-                if set([e.uuid for e in collection.ebooks]).symmetric_difference(set([e.uuid for e in actual_db_collections[collection_idx].ebooks])):
+                # drop the duplicates we got from update_lists_from_calibre_plugin_json....
+                actual_db_uuids = [e.uuid for e in actual_db_collections[collection_idx].ebooks]
+                mangled_uuids = [e.uuid for e in collection.ebooks]
+                #updated_ebooks = [mangled_uuids.remove(x) for x in actual_db_uuids]
+                #for x in actual_db_uuids:
+                #    mangled_uuids.remove(x)
+                #print "mangled_uuids: {}\n".format(mangled_uuids)
+
+                print "diff: {}\n".format(set(mangled_uuids).symmetric_difference(set(actual_db_uuids)))
+                if set(mangled_uuids).symmetric_difference(set(actual_db_uuids)):
+                    # even when not doing a complete rebuild, we'll need to rebuild this updated collection from scratch,
+                    # in order to avoid duplicate members in the SQL Collection db entry (and a bogus item count on at least non-cc-aware FW)...
+                    cc.delete_collection(collection.uuid)
+                    collection.is_new = True
+                    # Change its uuid to avoid Catalog shenanigans...
+                    collection.uuid = uuid.uuid4()
                     updated_db_collections.append(collection)
-                    print "Collection {} was updated".format(collection.uuid)
+                    print "Collection {} was updated, rebuild it from scratch\n".format(collection.uuid)
         # Use the diffed db ;)
         if updated_db_collections:
             db_collections = updated_db_collections
@@ -181,26 +209,19 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
             # if there were no changes, don't do anything. Importing the same db twice without the safety cleanups of a rebuild is prone to issues
             db_collections = []
 
+    # Make sure the deletes are executed first, to avoid Catalog shenanigans when updating an existing collection...
+    cc.execute()
+    cc.commands = []
+    # .. And sleep a bit to avoid bogus item counts when reintroducing collections with identical names than before... >_<"
+    time.sleep(1)
 
     # updating collections, creating them if necessary
     for collection in db_collections:
         if collection.is_new:
             # create new collections in db
             cc.insert_new_collection_entry(collection.uuid, collection.label)
-        # update all 'Collections' entries with new members
-        if complete_rebuild:
-            cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
-        else:
-            # if this is not a complete rebuild, only pass *new* members, or you get duplicate members in the Collection db entry (and a bogus item count on at least non-cc-aware FW).
-            # the downside of never dropping books from a collection in this instance is documented.
-            updated_ebooks_uuids = []
-            for e in collection.ebooks:
-                collection_idx = find_collection(actual_db_collections, collection.uuid)
-                if e.uuid not in [ae.uuid for ae in actual_db_collections[collection_idx].ebooks]:
-                    # new members in a collection
-                    print "Add new member {} to collection {}".format(e.uuid, collection.uuid)
-                    updated_ebooks_uuids.append(e.uuid)
-            cc.update_collections_entry(collection.uuid, updated_ebooks_uuids)
+        print "collection.ebooks: {}\n".format([e.uuid for e in collection.ebooks])
+        cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
 
     # if firmware requires updating ebook entries
     if cc.is_cc_aware:
@@ -281,9 +302,9 @@ if __name__ == "__main__":
             elif command == "delete":
                 log(LIBRARIAN_SYNC, "delete", "Deleting all collections...")
                 delete_all_collections(c)
-    except Exception, e:
+    except:
         log(LIBRARIAN_SYNC, "main", "Something went very wrong.", "E")
-        print e
+        traceback.print_exc()
     else:
         log(LIBRARIAN_SYNC, "main", "Done.")
         # Take care of buffered IO & KUAL's IO redirection...
