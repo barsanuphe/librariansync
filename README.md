@@ -104,10 +104,10 @@ file.
 
 ### Usage
 
-Note: if python2 is the default version on your Linux distribution, launch with *python3 librarian.py*.
+Note: if python2 is the default version on your Linux distribution, launch with *python3 librarian*.
 
-    $ python librarian.py -h
-    usage: librarian.py [-h] [-i] [-r] [-s] [-k] [-f [STRING [STRING ...]]]
+    $ ./librarian -h
+    usage: librarian [-h] [-i] [-r] [-s] [-k] [-f [STRING [STRING ...]]]
                         [-l [STRING [STRING ...]]] [-x STRING [STRING ...]]
                         [-t TAG [TAG ...]] [-d TAG [TAG ...]] [-c [COLLECTION]]
                         [--progress {read,reading,not_read}]
@@ -186,58 +186,58 @@ when both formats are available.
 Scrape a directory (specified in the configuration file) and automatically add
 to the library everything that was found:
 
-    python librarian.py -si
+    ./librarian -si
 
 Refresh the library after adding "Richard Morgan: Richard K. Morgan" to the
 author aliases in the configuration file, so that all "Richard Morgan" ebooks get
 renamed as "Richard K. Morgan":
 
-    python librarian.py -r
+    ./librarian -r
 
 List all tags and the number of ebooks for each:
 
-    python librarian.py -c
+    ./librarian -c
 
 List all yet untagged ebooks:
 
-    python librarian.py -c untagged
+    ./librarian -c untagged
 
 Display all ebooks in the library with the tag *sf/space opera*:
 
-    python librarian.py -f "tag:sf/space opera"
+    ./librarian -f "tag:sf/space opera"
 
 or
 
-    python librarian.py -c "sf/space opera"
+    ./librarian -c "sf/space opera"
 
 Display all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read:
 
-    python librarian.py -f "tag:sf/space opera" -x hamilton
+    ./librarian -f "tag:sf/space opera" -x hamilton
 
 Display all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    python librarian.py -l tag:opera dumas -x hamilton
+    ./librarian -l tag:opera dumas -x hamilton
 
 Tag as *best category* and *random* all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    python librarian.py -l tag:opera dumas -x hamilton -t "best category" random
+    ./librarian -l tag:opera dumas -x hamilton -t "best category" random
 
 Change tag from *best category* to *best category!* for all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    python librarian.py -l tag:opera dumas -x hamilton -d "best category" -t "best category!"
+    ./librarian -l tag:opera dumas -x hamilton -d "best category" -t "best category!"
 
 Sync to your Kindle all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    python librarian.py -l tag:opera dumas -x hamilton -k
+    ./librarian -l tag:opera dumas -x hamilton -k
 
 Display the title and description for all of your Aldous Huxley ebooks:
 
-    python librarian.py -f author:huxley --info title description
+    ./librarian -f author:huxley --info title description
 
 
 ## LibrarianSync
