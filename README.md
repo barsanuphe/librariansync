@@ -7,14 +7,14 @@ collections from tags (or folders).
 
 This is made of two parts:
 
-- [librarian.py](#librarian):
+- [librarian](#librarian):
     which can import epub ebooks, rename them from metadata, convert them to mobi,
     and sync with a Kindle Paperwhite.
     It can also perform basic search and add and remove tags.
 
 - [Librarian Sync](#librariansync):
     runs independantly on the Kindle, and can automatically build the collections
-    based on the tags added with librarian.py or according to the folder structure.
+    based on the tags added with librarian or according to the folder structure.
 
 ## Quick disclaimer
 
@@ -50,14 +50,14 @@ Also, this is in very early stages. This means:
 ### Requirements
 
 - Python 3
-- Calibre (librarian.py relies on ebook-convert, which are part of Calibre)
+- Calibre (librarian relies on ebook-convert, which are part of Calibre)
 - pyyaml
 - python-lxml
 - python-colorama (optional)
 
 ### Configuration
 
-*librarian.py* uses several special folders, as specified in the configuration
+*librarian* uses several special folders, as specified in the configuration
 file *librarian.yaml*:
 
 - *library_root*: where all ebooks are kept. More specifically, it will be divided in subfolders:
@@ -81,8 +81,6 @@ An example configuration would be:
     kindle_root: /run/media/login/Kindle
     library_root: /home/login/ebooks
     scrape_root: /home/login/documents
-    wanted:
-        Harry Harrisson: Make Room! Make Room!
 
 *kindle_root* and *library_root* are mandatory. The rest is optional.
 
@@ -95,9 +93,6 @@ Available information are: *$a* (author), *$y* (year), *$t* (title), *$s* (serie
 *$i* (series_index).
 Refreshing the database automatically applies the template.
 
-The *wanted* option is to be seen as a way to keep a wishlist. Librarian.py will
-remove the entries it finds on import.
-
 **Note**: Only epub ebooks can be added to the library. They are converted to
 mobi while syncing with the Kindle.
 If mobi ebooks are present in the *import* folder, they are converted to epub,
@@ -109,10 +104,10 @@ file.
 
 ### Usage
 
-Note: if python2 is the default version on your Linux distribution, launch with *python3 librarian.py*.
+Note: if python2 is the default version on your Linux distribution, launch with *python3 librarian*.
 
-    $ python librarian.py -h
-    usage: librarian.py [-h] [-i] [-r] [-s] [-k] [-f [STRING [STRING ...]]]
+    $ ./librarian -h
+    usage: librarian [-h] [-i] [-r] [-s] [-k] [-f [STRING [STRING ...]]]
                         [-l [STRING [STRING ...]]] [-x STRING [STRING ...]]
                         [-t TAG [TAG ...]] [-d TAG [TAG ...]] [-c [COLLECTION]]
                         [--progress {read,reading,not_read}]
@@ -171,7 +166,7 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     --config CONFIG_FILE  Use an alternative configuration file.
 
 
-While syncing with Kindle, *librarian.py* will keep track of previous conversions
+While syncing with Kindle, *librarian* will keep track of previous conversions
 to the mobi format (for epub ebooks), and of previously synced ebooks on the Kindle,
 and will try to work no more than necessary.
 
@@ -191,64 +186,64 @@ when both formats are available.
 Scrape a directory (specified in the configuration file) and automatically add
 to the library everything that was found:
 
-    python librarian.py -si
+    ./librarian -si
 
 Refresh the library after adding "Richard Morgan: Richard K. Morgan" to the
 author aliases in the configuration file, so that all "Richard Morgan" ebooks get
 renamed as "Richard K. Morgan":
 
-    python librarian.py -r
+    ./librarian -r
 
 List all tags and the number of ebooks for each:
 
-    python librarian.py -c
+    ./librarian -c
 
 List all yet untagged ebooks:
 
-    python librarian.py -c untagged
+    ./librarian -c untagged
 
 Display all ebooks in the library with the tag *sf/space opera*:
 
-    python librarian.py -f "tag:sf/space opera"
+    ./librarian -f "tag:sf/space opera"
 
 or
 
-    python librarian.py -c "sf/space opera"
+    ./librarian -c "sf/space opera"
 
 Display all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read:
 
-    python librarian.py -f "tag:sf/space opera" -x hamilton
+    ./librarian -f "tag:sf/space opera" -x hamilton
 
 Display all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    python librarian.py -l tag:opera dumas -x hamilton
+    ./librarian -l tag:opera dumas -x hamilton
 
 Tag as *best category* and *random* all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    python librarian.py -l tag:opera dumas -x hamilton -t "best category" random
+    ./librarian -l tag:opera dumas -x hamilton -t "best category" random
 
 Change tag from *best category* to *best category!* for all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    python librarian.py -l tag:opera dumas -x hamilton -d "best category" -t "best category!"
+    ./librarian -l tag:opera dumas -x hamilton -d "best category" -t "best category!"
 
 Sync to your Kindle all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    python librarian.py -l tag:opera dumas -x hamilton -k
+    ./librarian -l tag:opera dumas -x hamilton -k
 
 Display the title and description for all of your Aldous Huxley ebooks:
 
-    python librarian.py -f author:huxley --info title description
+    ./librarian -f author:huxley --info title description
 
 
 ## LibrarianSync
 
 This is the part that generates the Kindle collections from a json file.
-It can be used completely independently of librarian.py, provided the
+It can be used completely independently of librarian, provided the
 json file is correct (see example later) and in the correct location
 (inside the **extensions** folder on the Kindle).
 
@@ -302,7 +297,7 @@ which contains two entries:
 
 ### What it does
 
-After syncing with the main script librarian.py, and if tags are defined in
+After syncing with the main script librarian, and if tags are defined in
 library.yaml for entries, the **extensions** folder on the Kindle should contain
 a file, collections.json.
 

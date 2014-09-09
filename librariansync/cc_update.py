@@ -86,10 +86,13 @@ class CCUpdate(object):
                 } )
 
     def execute(self):
-        log(LIBRARIAN_SYNC, "cc_update", "Sending commands...")
-        full_command = { "commands" : self.commands, "type" : "ChangeRequest", "id" : 1 }
-        r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
-        if r.json()[u"ok"]:
-            log(LIBRARIAN_SYNC, "cc_update", "Success.")
+        if self.commands == []:
+            log(LIBRARIAN_SYNC, "cc_update", "Nothing to update.")
         else:
-            log(LIBRARIAN_SYNC, "cc_update", "Oh, no. It failed.", "E")
+            log(LIBRARIAN_SYNC, "cc_update", "Sending commands...")
+            full_command = { "commands" : self.commands, "type" : "ChangeRequest", "id" : 1 }
+            r = requests.post("http://localhost:9101/change", data = json.dumps(full_command), headers = {'content-type': 'application/json'} )
+            if r.json()[u"ok"]:
+                log(LIBRARIAN_SYNC, "cc_update", "Success.")
+            else:
+                log(LIBRARIAN_SYNC, "cc_update", "Oh, no. It failed.", "E")

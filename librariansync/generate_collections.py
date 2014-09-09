@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import json, os, uuid, sys, codecs, re, copy, traceback
+import json, os, uuid, sys, codecs, re, time, traceback
 import sqlite3
 from collections import defaultdict
 
@@ -101,18 +101,11 @@ def parse_legacy_hash(legacy_hash):
         cdetype = u'EBOK'
     return cdekey, cdetype
 
-def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, actual_db_collections, collection_contents, complete_rebuild):
+def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_contents):
+
     for (collection_label, ebook_hashes_list) in collection_contents.items():
         # find collection by label
-        if complete_rebuild:
-            collection_idx = find_collection(db_collections, collection_label)
-        else:
-            collection_idx = find_collection(actual_db_collections, collection_label)
-            if collection_idx != -1:
-                # Recreate that collection object from the real data, but with an empty book list
-                db_collections.append(Collection(actual_db_collections[collection_idx].uuid, collection_label, is_new = False))
-                # And then tweak the pointer properly
-                collection_idx = len(db_collections)-1
+        collection_idx = find_collection(db_collections, collection_label)
         if collection_idx == -1:
             # creating new collection object
             db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
@@ -123,7 +116,7 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, actual_db_c
             # find ebook by cdeKey
             ebook_idx = find_ebook(db_ebooks, cdekey)
             if ebook_idx == -1:
-                print "Couldn't match a db uuid to cdeKey {} (book not on device?)".format(cdekey)
+                print("Couldn't match a db uuid to cdeKey %s (book not on device?)"%cdekey)
                 continue # invalid
             # update ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
@@ -146,29 +139,16 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
     if complete_rebuild:
         # clear all current collections
         for (i, eb) in enumerate(db_ebooks):
-            db_ebooks[i].collections = []
+            db_ebooks[i].original_collections = []
         for (i, eb) in enumerate(db_collections):
-            db_collections[i].ebooks = []
+            db_collections[i].original_ebooks = []
         for collection in db_collections:
             cc.delete_collection(collection.uuid)
         db_collections = []
-        if source == "calibre_plugin":
-            actual_db_collections = []
-    else:
-        if source == "calibre_plugin":
-            # keep a copy of the real db data to handle our diff'ing...
-            actual_db_collections = copy.deepcopy(db_collections)
-            # forget about the actual db as our main pool of data
-            for (i, eb) in enumerate(db_ebooks):
-                db_ebooks[i].collections = []
-            for (i, eb) in enumerate(db_collections):
-                db_collections[i].ebooks = []
-            # Why? Because we can't just pass the new members of a collection to ccat, we have to pass the full members list, so this ends up being an okayish shortcut...
-            db_collections = []
 
     if source == "calibre_plugin":
         collections_contents = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
-        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, db_collections, actual_db_collections, collections_contents, complete_rebuild)
+        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collections_contents)
     else:
         if source == "folders":
             # parse folder structure
@@ -184,22 +164,16 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
             # create new collections in db
             cc.insert_new_collection_entry(collection.uuid, collection.label)
         # update all 'Collections' entries with new members
-        cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
+        collection.sort_ebooks()
+        if collection.ebooks != collection.original_ebooks:
+            cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
 
     # if firmware requires updating ebook entries
     if cc.is_cc_aware:
         # update all Item:Ebook entries with the number of collections it belongs to.
         for ebook in db_ebooks:
-            if complete_rebuild:
+            if len(ebook.collections) != len(ebook.original_collections):
                 cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
-            else:
-                # incremental update, only update books whose collections have changed
-                do_update = False
-                for collection in ebook.collections:
-                    if find_collection(db_collections, collection.uuid) != -1:
-                        do_update = True
-                if do_update:
-                    cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
 
     # send all the commands to update the database
     cc.execute()
@@ -236,6 +210,7 @@ def delete_all_collections(c):
 if __name__ == "__main__":
     command = sys.argv[1]
 
+    start = time.time()
     log(LIBRARIAN_SYNC, "main", "Starting...")
     try:
         with sqlite3.connect(KINDLE_DB_PATH) as cc_db:
@@ -268,7 +243,7 @@ if __name__ == "__main__":
         log(LIBRARIAN_SYNC, "main", "Something went very wrong.", "E")
         traceback.print_exc()
     else:
-        log(LIBRARIAN_SYNC, "main", "Done.")
+        log(LIBRARIAN_SYNC, "main", "Done in %.02fs."%(time.time()-start))
         # Take care of buffered IO & KUAL's IO redirection...
         sys.stdout.flush()
         sys.stderr.flush()
