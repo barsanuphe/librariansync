@@ -41,8 +41,8 @@ def parse_entries(cursor, ignore_empty_collections = True):
         collection_idx = find_collection(db_collections, collection_uuid)
         ebook_idx = find_ebook(db_ebooks, ebook_uuid)
         if collection_idx != -1 and ebook_idx != -1:
-            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
-            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
+            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx], True)
+            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx], True)
         else:
             print "Skipping collection {} (collection_idx: {}, ebook_idx: {})".format(collection_uuid, collection_idx, ebook_idx)
 
