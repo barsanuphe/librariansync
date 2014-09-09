@@ -5,7 +5,7 @@
         "priority": -1,
         "items": [
         {
-            "name": "Rebuild collections (from json)",
+            "name": "Rebuild collections (librarian)",
             "priority": 1,
             "exitmenu": false,
             "checked": true,
@@ -16,7 +16,7 @@
             "params": "rebuild"
         },
         {
-            "name": "Update collections (from json)",
+            "name": "Update collections (librarian)",
             "priority": 2,
             "exitmenu": false,
             "checked": true,
@@ -38,7 +38,7 @@
             "params": "rebuild_from_folders"
         },
         {
-            "name": "Rebuild collections (from calibre plugin json)",
+            "name": "Rebuild collections (calibre plugin)",
             "priority": 4,
             "exitmenu": false,
             "checked": true,
@@ -49,7 +49,7 @@
             "params": "rebuild_from_calibre_plugin_json"
         },
         {
-            "name": "Update collections (from calibre plugin json)",
+            "name": "Update collections (calibre plugin)",
             "priority": 5,
             "exitmenu": false,
             "checked": true,
