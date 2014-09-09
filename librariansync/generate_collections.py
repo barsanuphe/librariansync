@@ -48,7 +48,7 @@ def parse_entries(cursor, ignore_empty_collections = True):
 
     # remove empty collections:
     if ignore_empty_collections:
-        db_collections = [c for c in db_collections if len(c.ebooks) != 0]
+        db_collections = [c for c in db_collections if len(c.original_ebooks) != 0]
 
     return db_ebooks, db_collections
 
