@@ -86,7 +86,7 @@ class CCUpdate(object):
                 } )
 
     def execute(self):
-        if self.commands == []:
+        if not self.commands:
             log(LIBRARIAN_SYNC, "cc_update", "Nothing to update.")
         else:
             log(LIBRARIAN_SYNC, "cc_update", "Sending commands...")

@@ -22,7 +22,7 @@ SELECT_EBOOK_ENTRIES =         'select p_uuid, p_location, p_cdeKey, p_cdeType  
 SELECT_EXISTING_COLLECTIONS =  'select i_collection_uuid, i_member_uuid               from Collections'
 
 #-------- Existing Kindle database entries
-def parse_entries(cursor):
+def parse_entries(cursor, ignore_empty_collections = True):
     db_ebooks = []
     db_collections = []
 
@@ -43,9 +43,12 @@ def parse_entries(cursor):
         if collection_idx != -1 and ebook_idx != -1:
             db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx], True)
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx], True)
+        else:
+            print "Skipping collection {} (collection_idx: {}, ebook_idx: {})".format(collection_uuid, collection_idx, ebook_idx)
 
     # remove empty collections:
-    db_collections = [c for c in db_collections if len(c.original_ebooks) != 0]
+    if ignore_empty_collections:
+        db_collections = [c for c in db_collections if len(c.original_ebooks) != 0]
 
     return db_ebooks, db_collections
 
@@ -128,7 +131,7 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
 #-------- Main
 def update_cc_db(c, complete_rebuild = True, source = "folders"):
     # build dictionaries of ebooks/collections with their uuids
-    db_ebooks, db_collections = parse_entries(c)
+    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = True)
 
     # object that will handle all db updates
     cc = CCUpdate()
@@ -176,7 +179,7 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
     cc.execute()
 
 def export_existing_collections(c):
-    db_ebooks, db_collections = parse_entries(c)
+    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = True)
 
     export = {}
     for ebook in db_ebooks:
@@ -194,7 +197,7 @@ def export_existing_collections(c):
 
 def delete_all_collections(c):
     # build dictionaries of ebooks/collections with their uuids
-    db_ebooks, db_collections = parse_entries(c)
+    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = False)
 
     # object that will handle all db updates
     cc = CCUpdate()
@@ -236,9 +239,8 @@ if __name__ == "__main__":
             elif command == "delete":
                 log(LIBRARIAN_SYNC, "delete", "Deleting all collections...")
                 delete_all_collections(c)
-    except Exception, e:
+    except:
         log(LIBRARIAN_SYNC, "main", "Something went very wrong.", "E")
-        print e
         traceback.print_exc()
     else:
         log(LIBRARIAN_SYNC, "main", "Done in %.02fs."%(time.time()-start))
