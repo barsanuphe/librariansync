@@ -33,8 +33,11 @@ else:
 EIPS_MAXCHARS=SCREEN_X_RES / EIPS_X_RES
 EIPS_MAXLINES=SCREEN_Y_RES / EIPS_Y_RES
 
-def log(program, function, msg, level = "I", display = True):
+LAST_SHOWN = 0
+MINIMAL_DELAY = 0.15
 
+def log(program, function, msg, level = "I", display = True):
+    global LAST_SHOWN
     # open syslog
     syslog.openlog('system: %s %s:%s:'%(level, program, function))
     # set priority
@@ -59,9 +62,14 @@ def log(program, function, msg, level = "I", display = True):
         displayed += msg
         # pad with blanks
         displayed += (EIPS_MAXCHARS - len(displayed))*' '
+        # to prevent unsightly screen flickering if ever two logs
+        # are to be displayed in close temporal proximity
+        delta = time.time() - LAST_SHOWN
+        if delta < MINIMAL_DELAY:
+            time.sleep(MINIMAL_DELAY-delta)
         # print using eips
         subprocess.call(['eips', '0', str(EIPS_MAXLINES - 3), program_display], stderr = DEVNULL)
         subprocess.call(['eips', '0', str(EIPS_MAXLINES - 2), displayed], stderr = DEVNULL)
-        # to prevent unsightly screen flickering if ever two logs
-        # are to be displayed in close temporal proximity
-        time.sleep(0.15)
+        # print using titlebar?
+        #subprocess.call(["lipc-set-prop", "com.lab126.pillow", "configureChrome", """{"titleBar":{"clientParams":{"secondary":"%s","useDefaultPrimary":false}}}"""%displayed], stderr = DEVNULL)
+        LAST_SHOWN = time.time()
