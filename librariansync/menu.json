@@ -13,7 +13,7 @@
             "status": false,
             "internal": "status Rebuilding collections (from librarian) . . .",
             "action": "./generate_collections.py",
-            "params": "rebuild"
+            "params": "--rebuild"
         },
         {
             "name": "Update collections (librarian)",
@@ -24,7 +24,7 @@
             "status": false,
             "internal": "status Updating collections (from librarian) . . .",
             "action": "./generate_collections.py",
-            "params": "update"
+            "params": "--update"
         },
         {
             "name": "Rebuild collections (from folders)",
@@ -35,7 +35,7 @@
             "status": false,
             "internal": "status Rebuilding collections (from directory structure) . . .",
             "action": "./generate_collections.py",
-            "params": "rebuild_from_folders"
+            "params": "--folders"
         },
         {
             "name": "Rebuild collections (calibre plugin)",
@@ -46,7 +46,7 @@
             "status": false,
             "internal": "status Rebuilding collections (from Calibre) . . .",
             "action": "./generate_collections.py",
-            "params": "rebuild_from_calibre_plugin_json"
+            "params": "--rebuild-calibre"
         },
         {
             "name": "Update collections (calibre plugin)",
@@ -57,7 +57,7 @@
             "status": false,
             "internal": "status Updating collections (from Calibre) . . .",
             "action": "./generate_collections.py",
-            "params": "update_from_calibre_plugin_json"
+            "params": "--update-calibre"
         },
         {
             "name": "Export current collections",
@@ -68,7 +68,7 @@
             "status": false,
             "internal": "status Exporting collections . . .",
             "action": "./generate_collections.py",
-            "params": "export"
+            "params": "--export"
         },
         {
             "name": "********",
@@ -99,7 +99,7 @@
             "status": false,
             "internal": "status Deleting all collections . . .",
             "action": "./generate_collections.py",
-            "params": "delete"
+            "params": "--delete"
         }
         ]
     }
