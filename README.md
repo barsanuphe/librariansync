@@ -106,15 +106,17 @@ file.
 
 Note: if python2 is the default version on your Linux distribution, launch with *python3 librarian*.
 
+
     $ ./librarian -h
-    usage: librarian [-h] [-i] [-r] [-s] [-k] [-f [STRING [STRING ...]]]
-                        [-l [STRING [STRING ...]]] [-x STRING [STRING ...]]
-                        [-t TAG [TAG ...]] [-d TAG [TAG ...]] [-c [COLLECTION]]
-                        [--progress {read,reading,not_read}]
-                        [--info [METADATA_FIELD [METADATA_FIELD ...]]]
-                        [--openlibrary]
-                        [--write-metadata METADATA_FIELD_AND_VALUE [METADATA_FIELD_AND_VALUE ...]]
-                        [--config CONFIG_FILE]
+    usage: librarian [-h] [-i] [-r] [--scrape] [-s [PATH]] [-k]
+                    [-f [STRING [STRING ...]]] [-l [STRING [STRING ...]]]
+                    [-x STRING [STRING ...]] [-t TAG [TAG ...]]
+                    [-d TAG [TAG ...]] [-c [COLLECTION]]
+                    [--progress {read,reading,not_read}]
+                    [--info [METADATA_FIELD [METADATA_FIELD ...]]]
+                    [--openlibrary]
+                    [-w METADATA_FIELD_AND_VALUE [METADATA_FIELD_AND_VALUE ...]]
+                    [--config CONFIG_FILE]
 
     Librarian. A very early version of it.
 
@@ -126,9 +128,10 @@ Note: if python2 is the default version on your Linux distribution, launch with 
 
     -i, --import          import ebooks
     -r, --refresh         refresh library
-    -s, --scrape          scrape for ebooks
-    -k, --sync-kindle     sync library (or a subset with --filter or --list)
-                            with kindle
+    --scrape              scrape for ebooks
+    -s [PATH], --sync [PATH]
+                            sync library (or a subset with --filter or --list)
+    -k, --kindle          when syncing, sync to kindle
 
     Tagging:
     Search and tag ebooks. For --list, --filter and --exclude, STRING can
@@ -157,7 +160,7 @@ Note: if python2 is the default version on your Linux distribution, launch with 
                             Display all or a selection of metadata tags for
                             filtered ebooks.
     --openlibrary         Search OpenLibrary for filtered ebooks.
-    --write-metadata METADATA_FIELD_AND_VALUE [METADATA_FIELD_AND_VALUE ...]
+    -w METADATA_FIELD_AND_VALUE [METADATA_FIELD_AND_VALUE ...], --write-metadata METADATA_FIELD_AND_VALUE [METADATA_FIELD_AND_VALUE ...]
                             Write one or several field:value metadata.
 
     Configuration:
@@ -186,7 +189,7 @@ when both formats are available.
 Scrape a directory (specified in the configuration file) and automatically add
 to the library everything that was found:
 
-    ./librarian -si
+    ./librarian --scrape -i
 
 Refresh the library after adding "Richard Morgan: Richard K. Morgan" to the
 author aliases in the configuration file, so that all "Richard Morgan" ebooks get
@@ -233,7 +236,7 @@ F. Hamilton books you just read, and also everything by Alexandre Dumas:
 Sync to your Kindle all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    ./librarian -l tag:opera dumas -x hamilton -k
+    ./librarian -l tag:opera dumas -x hamilton -sk
 
 Display the title and description for all of your Aldous Huxley ebooks:
 
