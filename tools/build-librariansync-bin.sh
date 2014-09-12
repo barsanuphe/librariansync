@@ -3,7 +3,7 @@
 HACKNAME="librariansync"
 PKGNAME="${HACKNAME}"
 PKGVER=$1
-DEVICE="pw2"
+DEVICE="kindle5"
 
 # check for kindletool
 if (( $(kindletool version | wc -l) != 1 )) ; then
@@ -21,6 +21,10 @@ tar -zcvf librariansync.tar.gz \
     librariansync/kindle_contents.py \
     librariansync/kindle_logging.py \
     librariansync/cc_update.py
+
+# patch config.xml
+# not exactly the most elegant way to do this.
+sed -i "s/<version>1.0<\/version>/<version>${PKGVER}<\/version>/g" librariansync/config.xml
 
 # build the update
 kindletool create ota2 -d ${DEVICE} librariansync.tar.gz install.sh Update_${PKGNAME}_${PKGVER}_${DEVICE}.bin
