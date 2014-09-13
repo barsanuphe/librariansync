@@ -48,7 +48,7 @@ def log(program, function, msg, level = "I", display = True):
         priority = syslog.LOG_WARNING
     priority |= syslog.LOG_LOCAL4
     # write to syslog
-    syslog.syslog(priority, msg)
+    syslog.syslog(priority, msg.encode("utf8"))
     #
     # NOTE: showlog / showlog -f to check the logs
     #
@@ -59,7 +59,7 @@ def log(program, function, msg, level = "I", display = True):
         # If loglevel is anything else than I, add it to our tag
         if level != "I":
             displayed += "[%s] "%level
-        displayed += msg
+        displayed += msg.encode('ascii', 'replace')
         # pad with blanks
         displayed += (EIPS_MAXCHARS - len(displayed))*' '
         # to prevent unsightly screen flickering if ever two logs

@@ -81,14 +81,14 @@
             "action": ":"
         },
         {
-            "name": "********",
+            "name": "Download from librarian",
             "priority": 8,
             "exitmenu": false,
             "checked": false,
             "refresh": false,
             "status": false,
-            "internal": "status noop",
-            "action": ":"
+            "internal": "status Downloading from librarian...",
+            "action": "./librarian_download.py"
         },
         {
             "name": "Delete all collections",
