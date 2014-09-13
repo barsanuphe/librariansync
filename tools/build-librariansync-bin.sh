@@ -1,5 +1,11 @@
 #! /bin/sh -e
 
+# checking argument
+if [ $# -eq 0 ]; then
+    echo "Version number must be provided."
+    exit 1
+fi
+
 HACKNAME="librariansync"
 PKGNAME="${HACKNAME}"
 PKGVER=$1
