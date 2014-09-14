@@ -26,8 +26,8 @@ Also, this is in very early stages. This means:
 - Keep backups of your ebooks, both on your computer and your Kindle.
 - This is tested on Archlinux, it should work on other distributions/platforms,
     but then again it may not because reasons.
-- The LibrarySync part is a little more mature, and has been tested on a european
-    wi-fi Kindle pw2. It may work on other models, but this is all I have.
+- The LibrarySync part is a little more mature, and should work on all Kindle 5
+models (Touch, Paperwhite 1 & 2) with reasonnably recent firmware.
 
 ## Table of Contents
 
@@ -40,6 +40,7 @@ Also, this is in very early stages. This means:
 - [LibrarianSync](#librariansync)
     - [Requirements](#requirements-1)
     - [Installation](#installation)
+    - [Configuration](#configuration-1)
     - [Usage](#usage-1)
     - [What it does](#what-it-does)
     - [collection.json example](#collectionsjson-example)
@@ -81,6 +82,9 @@ An example configuration would be:
     kindle_root: /run/media/login/Kindle
     library_root: /home/login/ebooks
     scrape_root: /home/login/documents
+    server:
+        IP: 192.168.0.5
+        port: 13698
 
 *kindle_root* and *library_root* are mandatory. The rest is optional.
 
@@ -92,6 +96,10 @@ by default '$a/$a ($y) $t'.
 Available information are: *$a* (author), *$y* (year), *$t* (title), *$s* (series),
 *$i* (series_index).
 Refreshing the database automatically applies the template.
+
+The *server* configuration allows *librarian* to serve a selection of ebooks over
+http. It is then possible to use a well configured *LibrarianSync* to automatically
+connect, download the ebooks, and update the Kindle collections accordingly.
 
 **Note**: Only epub ebooks can be added to the library. They are converted to
 mobi while syncing with the Kindle.
@@ -106,17 +114,16 @@ file.
 
 Note: if python2 is the default version on your Linux distribution, launch with *python3 librarian*.
 
-
-    $ ./librarian -h
-    usage: librarian [-h] [-i] [-r] [--scrape] [-s [PATH]] [-k]
+    $ librarian -h
+    usage: librarian [-h] [-i] [-r] [--scrape] [-s [PATH]] [-k] [--serve]
                     [-f [STRING [STRING ...]]] [-l [STRING [STRING ...]]]
                     [-x STRING [STRING ...]] [-t TAG [TAG ...]]
                     [-d TAG [TAG ...]] [-c [COLLECTION]]
-                    [--progress {read,reading,not_read}]
+                    [--progress {read,reading,unread}]
                     [--info [METADATA_FIELD [METADATA_FIELD ...]]]
                     [--openlibrary]
                     [-w METADATA_FIELD_AND_VALUE [METADATA_FIELD_AND_VALUE ...]]
-                    [--config CONFIG_FILE]
+                    [--config CONFIG_FILE] [--readable-db]
 
     Librarian. A very early version of it.
 
@@ -132,6 +139,7 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     -s [PATH], --sync [PATH]
                             sync library (or a subset with --filter or --list)
     -k, --kindle          when syncing, sync to kindle
+    --serve               serve filtered ebooks over http
 
     Tagging:
     Search and tag ebooks. For --list, --filter and --exclude, STRING can
@@ -150,7 +158,7 @@ Note: if python2 is the default version on your Linux distribution, launch with 
                             remove tag(s) from listed ebooks in library
     -c [COLLECTION], --collections [COLLECTION]
                             list all tags or ebooks with a given tag or "untagged"
-    --progress {read,reading,not_read}
+    --progress {read,reading,unread}
                             Set filtered ebooks as read.
 
     Metadata:
@@ -167,6 +175,7 @@ Note: if python2 is the default version on your Linux distribution, launch with 
     Configuration options.
 
     --config CONFIG_FILE  Use an alternative configuration file.
+    --readable-db         Save the database in somewhat readable form.
 
 
 While syncing with Kindle, *librarian* will keep track of previous conversions
@@ -236,12 +245,21 @@ F. Hamilton books you just read, and also everything by Alexandre Dumas:
 Sync to your Kindle all ebooks in the library with the tag *sf/space opera*, but not the Peter
 F. Hamilton books you just read, and also everything by Alexandre Dumas:
 
-    ./librarian -l tag:opera dumas -x hamilton -sk
+    ./librarian -l tag:opera dumas -x hamilton -s -k
+
+Serve over http for your Kindle, all ebooks (in .mobi forma) in the library with
+the tag *sf/space opera*, but not the Peter F. Hamilton books you just read, and
+also everything by Alexandre Dumas:
+
+    ./librarian -l tag:opera dumas -x hamilton --serve -k
 
 Display the title and description for all of your Aldous Huxley ebooks:
 
     ./librarian -f author:huxley --info title description
 
+Mark all ebooks by Alexandre Dumas as read:
+
+    ./librarian -f author:dumas --progress read
 
 ## LibrarianSync
 
@@ -296,7 +314,32 @@ which contains two entries:
 - *Export current collections* :
     generates exported_collections.json in the **extensions** folder from current
     collections.
+- *Download from librarian*:
+    If *librarian* is serving ebooks, retrieves the list of available files,
+    downloads them all, retrieves the collections.json for the new ebooks, and
+    automatically updates collections.
 - *Delete all collections*
+
+
+### Configuration
+
+*LibrarianSync* only requires configuration when used to download ebooks served
+over http by *librarian*.
+
+In the **extensions/librariansync** folder, there should be a *librarian_download.ini*
+file such as:
+
+    [server]
+    IP = 192.168.0.5|192.168.15.201
+    port = 13698
+
+
+*IP* is a |-separated list of IP addresses.
+The IP address should be the same as the one given in the *librarian* configuration.
+
+When more than one address is given, *LibrarianSync* tries to connect to each one.
+The idea is to be able to download using Wi-Fi or USBNetwork, so the list of IP
+addresses can define serveral interfaces of the same server, or different servers.
 
 ### What it does
 
@@ -325,6 +368,13 @@ backed up, modified, and used to *rebuild collections* (if renamed
 *collections.json*).
 At the same time, another json file is written, to be used with the Calibre
 Kindle plugin.
+
+When *downloading from librarian*, it connects (using Wi-Fi or USBNetwork, depending
+on your configuration) to the http server temporarily created by *librarian*,
+downloads the available ebooks, and updates the collections using information given
+by *librarian*.
+*LibrarianSync* notifies *librarian* when it is done, and *librarian* shuts down
+its server automatically.
 
 Always allow for a few seconds for the Kindle database and interface to reflect the
 changes made.
