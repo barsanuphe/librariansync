@@ -10,24 +10,26 @@ This is made of two parts:
 - [librarian](#librarian):
     which can import epub ebooks, rename them from metadata, convert them to mobi,
     and sync with a Kindle Paperwhite.
-    It can also perform basic search and add and remove tags.
+    It can also run queries using all metadata, and add and remove tags which
+    can be converted to Kindle collections with LibrarianSync.
+    There is experimental support to write metadata, and to server ebooks over http
+    to LibrarianSync on a Kindle.
+    It is in early stages. See disclaimer below.
 
 - [LibrarianSync](#librariansync):
     runs independantly on the Kindle, and can automatically build the collections
     based on the tags added with librarian or according to the folder structure.
+    It and should work on all Kindle 5 models (Touch, Paperwhite 1 & 2) with
+    reasonnably recent firmware.
 
-## Quick disclaimer
+## Quick disclaimer about librarian
 
-There is no guarantee that this will be useful to anyone but myself.
-
-Also, this is in very early stages. This means:
+*librarian* is in development and not even close to being stable. This means:
 
 - Expect the commands and database formats to change any time.
 - Keep backups of your ebooks, both on your computer and your Kindle.
-- This is tested on Archlinux, it should work on other distributions/platforms,
+- *librarian* is tested on Archlinux, it should work on other distributions/platforms,
     but then again it may not because reasons.
-- The LibrarySync part is a little more mature, and should work on all Kindle 5
-models (Touch, Paperwhite 1 & 2) with reasonnably recent firmware.
 
 ## Table of Contents
 
