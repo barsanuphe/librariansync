@@ -94,7 +94,6 @@ if __name__ == "__main__":
         log(LIBRARIAN_SYNC, "connect", "Impossible to connect to librarian.", "E")
     else:
         # update collections
-        #subprocess.call(["dbus-send", "--system", "/default", "com.lab126.powerd.resuming int32:1"])
         try:
             with sqlite3.connect(KINDLE_DB_PATH) as cc_db:
                 c = cc_db.cursor()

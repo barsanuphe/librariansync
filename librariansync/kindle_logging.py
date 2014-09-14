@@ -48,7 +48,7 @@ def log(program, function, msg, level = "I", display = True):
         priority = syslog.LOG_WARNING
     priority |= syslog.LOG_LOCAL4
     # write to syslog
-    syslog.syslog(priority, msg.encode("utf8"))
+    syslog.syslog(priority, msg)
     #
     # NOTE: showlog / showlog -f to check the logs
     #
