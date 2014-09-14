@@ -12,7 +12,7 @@ This is made of two parts:
     and sync with a Kindle Paperwhite.
     It can also perform basic search and add and remove tags.
 
-- [Librarian Sync](#librariansync):
+- [LibrarianSync](#librariansync):
     runs independantly on the Kindle, and can automatically build the collections
     based on the tags added with librarian or according to the folder structure.
 
