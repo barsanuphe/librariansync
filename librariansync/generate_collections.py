@@ -22,7 +22,7 @@ SELECT_EBOOK_ENTRIES =         'select p_uuid, p_location, p_cdeKey, p_cdeType  
 SELECT_EXISTING_COLLECTIONS =  'select i_collection_uuid, i_member_uuid               from Collections'
 
 #-------- Existing Kindle database entries
-def parse_entries(cursor, ignore_empty_collections = True):
+def parse_entries(cursor, ignore_empty_collections = False):
     db_ebooks = []
     db_collections = []
 
@@ -135,7 +135,7 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
 #-------- Main
 def update_cc_db(c, complete_rebuild = True, source = "folders"):
     # build dictionaries of ebooks/collections with their uuids
-    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = True)
+    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = False)
 
     # object that will handle all db updates
     cc = CCUpdate()
