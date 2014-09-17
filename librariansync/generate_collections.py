@@ -1,87 +1,115 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import json, os, uuid, sys, codecs, re, time, traceback, argparse
+import json
+import os
+import uuid
+import sys
+import codecs
+import re
+import time
+import traceback
+import argparse
 import sqlite3
 from collections import defaultdict
 
 from cc_update import CCUpdate
-from kindle_contents import *
-from kindle_logging import *
+from kindle_contents import Ebook, Collection
+from kindle_contents import find_collection, find_ebook, list_folder_contents
+from kindle_logging import log, LIBRARIAN_SYNC
 
-#-------- Config
-LIBRARIAN_SYNC =        "LibrarianSync"
-KINDLE_DB_PATH =        "/var/local/cc.db"
-TAGS =                  "../collections.json"
-CALIBRE_PLUGIN_FILE =   "/mnt/us/system/collections.json"
-EXPORT =                "../exported_collections.json"
-KINDLE_EBOOKS_ROOT =    "/mnt/us/documents/"
+# -------- Config
+KINDLE_DB_PATH = "/var/local/cc.db"
+TAGS = "../collections.json"
+CALIBRE_PLUGIN_FILE = "/mnt/us/system/collections.json"
+EXPORT = "../exported_collections.json"
+KINDLE_EBOOKS_ROOT = "/mnt/us/documents/"
 
-SELECT_COLLECTION_ENTRIES =    'select p_uuid, p_titles_0_nominal                     from Entries where p_type = "Collection"'
-SELECT_EBOOK_ENTRIES =         'select p_uuid, p_location, p_cdeKey, p_cdeType        from Entries where p_type = "Entry:Item"'
-SELECT_EXISTING_COLLECTIONS =  'select i_collection_uuid, i_member_uuid               from Collections'
+SELECT_COLLECTION_ENTRIES = 'select p_uuid, p_titles_0_nominal '\
+                            'from Entries where p_type = "Collection"'
+SELECT_EBOOK_ENTRIES = 'select p_uuid, p_location, p_cdeKey, p_cdeType '\
+                       'from Entries where p_type = "Entry:Item"'
+SELECT_EXISTING_COLLECTIONS = 'select i_collection_uuid, i_member_uuid '\
+                              'from Collections'
 
-#-------- Existing Kindle database entries
-def parse_entries(cursor, ignore_empty_collections = False):
+
+# -------- Existing Kindle database entries
+def parse_entries(cursor, ignore_empty_collections=False):
     db_ebooks = []
     db_collections = []
 
     cursor.execute(SELECT_COLLECTION_ENTRIES)
-    for (uuid, label) in cursor.fetchall():
-        db_collections.append(Collection(uuid, label))
+    for (c_uuid, label) in cursor.fetchall():
+        db_collections.append(Collection(c_uuid, label))
 
     cursor.execute(SELECT_EBOOK_ENTRIES)
-    for (uuid, location, cdekey, cdetype) in cursor.fetchall():
+    for (e_uuid, location, cdekey, cdetype) in cursor.fetchall():
         # only consider user ebooks
         if location is not None and KINDLE_EBOOKS_ROOT in location:
-            db_ebooks.append(Ebook(uuid, location, cdekey, cdetype))
+            db_ebooks.append(Ebook(e_uuid, location, cdekey, cdetype))
 
     cursor.execute(SELECT_EXISTING_COLLECTIONS)
     for (collection_uuid, ebook_uuid) in cursor.fetchall():
         collection_idx = find_collection(db_collections, collection_uuid)
         ebook_idx = find_ebook(db_ebooks, ebook_uuid)
         if collection_idx != -1 and ebook_idx != -1:
-            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx], True)
-            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx], True)
+            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx],
+                                                     True)
+            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx],
+                                                True)
         else:
             log(LIBRARIAN_SYNC, "parse_entries",
-                "Skipping collection {} (collection_idx: {}, ebook_idx: {})".format(collection_uuid, collection_idx, ebook_idx),
-                "W", display = False)
+                "Skipping collection {} (collection_idx: {}, ebook_idx: {})"
+                .format(collection_uuid, collection_idx, ebook_idx),
+                "W", display=False)
 
     # remove empty collections:
     if ignore_empty_collections:
-        db_collections = [c for c in db_collections if len(c.original_ebooks) != 0]
+        db_collections = [c for c in db_collections
+                          if len(c.original_ebooks) != 0]
 
     return db_ebooks, db_collections
 
-#-------- JSON collections
+
+# -------- JSON collections
 def parse_config(config_file):
     return json.load(open(config_file, 'r'), 'utf8')
 
+
 def parse_calibre_plugin_config(config_file):
     calibre_plugin_config = json.load(open(config_file, 'r'), 'utf8')
-    # Handle the locale properly (it might not be here, or the collection name might contain an @, so split doesn't cut it). RegEx borrowed from the KCP.
+    # handle the locale properly (RegEx borrowed from the KCP)
     coll_name_pattern = re.compile(r'^(.*)@[^@]+$')
-    collection_names = [coll_name_pattern.sub(r'\1', el) for el in calibre_plugin_config.keys()]
-    collection_members_uuid = defaultdict(list) # collection_label: [ebook_uuid, ...]
+    # collection_label: [ebook_uuid, ...]
+    collection_members_uuid = defaultdict(list)
     for collection in calibre_plugin_config.keys():
-        collection_members_uuid[coll_name_pattern.sub(r'\1', collection)].extend( calibre_plugin_config[collection]["items"])
+        collection_members_uuid[
+            coll_name_pattern.sub(r'\1', collection)
+            ].extend(calibre_plugin_config[collection]["items"])
     return collection_members_uuid
 
-def update_lists_from_librarian_json(db_ebooks, db_collections, collection_contents):
 
-    for (ebook_location, ebook_collection_labels_list) in collection_contents.items():
+def update_lists_from_librarian_json(db_ebooks, db_collections,
+                                     collection_contents):
+
+    for (ebook_location,
+         ebook_collection_labels_list) in collection_contents.items():
         # find ebook by location
-        ebook_idx = find_ebook(db_ebooks, os.path.join(KINDLE_EBOOKS_ROOT,ebook_location))
+        ebook_idx = find_ebook(db_ebooks, os.path.join(KINDLE_EBOOKS_ROOT,
+                                                       ebook_location))
         if ebook_idx == -1:
-            log(LIBRARIAN_SYNC, "update librarian", "Invalid location: %s"%ebook_location.encode("utf8"), "W", display = False)
-            continue # invalid
+            log(LIBRARIAN_SYNC, "update librarian",
+                "Invalid location: %s" % ebook_location.encode("utf8"),
+                "W", display=False)
+            continue  # invalid
         for collection_label in ebook_collection_labels_list:
             # find collection by label
             collection_idx = find_collection(db_collections, collection_label)
             if collection_idx == -1:
                 # creating new collection object
-                db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
+                db_collections.append(Collection(uuid.uuid4(),
+                                                 collection_label,
+                                                 is_new=True))
                 collection_idx = len(db_collections)-1
             # udpate ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
@@ -93,6 +121,7 @@ def update_lists_from_librarian_json(db_ebooks, db_collections, collection_conte
 
     return db_ebooks, db_collections
 
+
 # Return a cdeKey, cdeType couple from a legacy json hash
 def parse_legacy_hash(legacy_hash):
     if legacy_hash.startswith('#'):
@@ -103,25 +132,32 @@ def parse_legacy_hash(legacy_hash):
         cdetype = u'EBOK'
     return cdekey, cdetype
 
-def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_contents):
+
+def update_lists_from_calibre_plugin_json(db_ebooks, db_collections,
+                                          collection_contents):
 
     for (collection_label, ebook_hashes_list) in collection_contents.items():
         # find collection by label
         collection_idx = find_collection(db_collections, collection_label)
         if collection_idx == -1:
             # creating new collection object
-            db_collections.append(Collection(uuid.uuid4(), collection_label, is_new = True))
+            db_collections.append(Collection(uuid.uuid4(), collection_label,
+                                             is_new=True))
             collection_idx = len(db_collections)-1
+
         for ebook_hash in ebook_hashes_list:
             cdekey, cdetype = parse_legacy_hash(ebook_hash)
-            # NOTE: We don't actually use the cdeType. We shouldn't need to, unless we run into the extremely unlikely case of two items with the same cdeKey, but different cdeTypes
+            # NOTE: We don't actually use the cdeType. We shouldn't need to,
+            # unless we run into the extremely unlikely case of two items with
+            # the same cdeKey, but different cdeTypes
             # find ebook by cdeKey
             ebook_idx = find_ebook(db_ebooks, cdekey)
             if ebook_idx == -1:
                 log(LIBRARIAN_SYNC, "update calibre",
-                            "Couldn't match a db uuid to cdeKey %s (book not on device?)"%cdekey,
-                            "W", display = False)
-                continue # invalid
+                    "Couldn't match a db uuid to cdeKey %s"
+                    "(book not on device?)" % cdekey,
+                    "W", display=False)
+                continue  # invalid
             # update ebook
             db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
             # update collection
@@ -132,10 +168,12 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collection_
 
     return db_ebooks, db_collections
 
-#-------- Main
-def update_cc_db(c, complete_rebuild = True, source = "folders"):
+
+# -------- Main
+def update_cc_db(c, complete_rebuild=True, source="folders"):
     # build dictionaries of ebooks/collections with their uuids
-    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = False)
+    db_ebooks, db_collections = parse_entries(c,
+                                              ignore_empty_collections=False)
 
     # object that will handle all db updates
     cc = CCUpdate()
@@ -152,7 +190,8 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
 
     if source == "calibre_plugin":
         collections_contents = parse_calibre_plugin_config(CALIBRE_PLUGIN_FILE)
-        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(db_ebooks, db_collections, collections_contents)
+        db_ebooks, db_collections = update_lists_from_calibre_plugin_json(
+            db_ebooks, db_collections, collections_contents)
     else:
         if source == "folders":
             # parse folder structure
@@ -160,7 +199,8 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
         else:
             # parse tags json
             collections_contents = parse_config(TAGS)
-        db_ebooks, db_collections = update_lists_from_librarian_json(db_ebooks, db_collections, collections_contents)
+        db_ebooks, db_collections = update_lists_from_librarian_json(
+            db_ebooks, db_collections, collections_contents)
 
     # updating collections, creating them if necessary
     for collection in db_collections:
@@ -170,11 +210,13 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
         # update all 'Collections' entries with new members
         collection.sort_ebooks()
         if collection.ebooks != collection.original_ebooks:
-            cc.update_collections_entry(collection.uuid, [e.uuid for e in collection.ebooks])
+            cc.update_collections_entry(collection.uuid,
+                                        [e.uuid for e in collection.ebooks])
 
     # if firmware requires updating ebook entries
     if cc.is_cc_aware:
-        # update all Item:Ebook entries with the number of collections it belongs to.
+        # update all Item:Ebook entries with the number of collections
+        # it belongs to.
         for ebook in db_ebooks:
             if len(ebook.collections) != len(ebook.original_collections):
                 cc.update_ebook_entry(ebook.uuid, len(ebook.collections))
@@ -182,26 +224,33 @@ def update_cc_db(c, complete_rebuild = True, source = "folders"):
     # send all the commands to update the database
     cc.execute()
 
+
 def export_existing_collections(c):
-    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = True)
+    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections=True)
 
     export = {}
     for ebook in db_ebooks:
         export.update(ebook.to_librarian_json())
 
     with codecs.open(EXPORT, "w", "utf8") as export_json:
-        export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
+        export_json.write(json.dumps(export, sort_keys=True, indent=2,
+                                     separators=(',', ': '),
+                                     ensure_ascii=False))
 
     export = {}
     for collection in db_collections:
         export.update(collection.to_calibre_plugin_json())
 
     with codecs.open(CALIBRE_PLUGIN_FILE, "w", "utf8") as export_json:
-        export_json.write(json.dumps(export, sort_keys=True, indent=2, separators=(',', ': '), ensure_ascii = False))
+        export_json.write(json.dumps(export, sort_keys=True, indent=2,
+                                     separators=(',', ': '),
+                                     ensure_ascii=False))
+
 
 def delete_all_collections(c):
     # build dictionaries of ebooks/collections with their uuids
-    db_ebooks, db_collections = parse_entries(c, ignore_empty_collections = False)
+    db_ebooks, db_collections = parse_entries(c,
+                                              ignore_empty_collections=False)
 
     # object that will handle all db updates
     cc = CCUpdate()
@@ -209,18 +258,33 @@ def delete_all_collections(c):
         cc.delete_collection(collection.uuid)
     cc.execute()
 
-#-------------------------------------------------------
-
+# -------------------------------------------------------
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Librarian Sync. Build Kindle collections, fast and without style.')
-    parser.add_argument('-x', '--export',    dest='export',          action='store_true', default = False, help='export collections.')
-    parser.add_argument('-d', '--delete',    dest='delete',          action='store_true', default = False, help='delete collections.')
-    parser.add_argument('-f', '--folders',   dest='folders',         action='store_true', default = False, help='rebuild from folder structure.')
-    parser.add_argument('-u', '--update',    dest='update',          action='store_true', default = False, help='update collections from librarian.')
-    parser.add_argument('-r', '--rebuild',   dest='rebuild',         action='store_true', default = False, help='rebuild collections from librarian.')
-    parser.add_argument('--update-calibre',  dest='update_calibre',  action='store_true', default = False, help='update collections from calibre kindle plugin.')
-    parser.add_argument('--rebuild-calibre', dest='rebuild_calibre', action='store_true', default = False, help='rebuild collections from calibre kindle plugin.')
+    parser = argparse.ArgumentParser(description='Librarian Sync. Build Kindle'
+                                     'collections, fast and without style.')
+
+    parser.add_argument('-x', '--export',    dest='export',
+                        action='store_true', default=False,
+                        help='export collections.')
+    parser.add_argument('-d', '--delete',    dest='delete',
+                        action='store_true', default=False,
+                        help='delete collections.')
+    parser.add_argument('-f', '--folders',   dest='folders',
+                        action='store_true', default=False,
+                        help='rebuild from folder structure.')
+    parser.add_argument('-u', '--update',    dest='update',
+                        action='store_true', default=False,
+                        help='update collections from librarian.')
+    parser.add_argument('-r', '--rebuild',   dest='rebuild',
+                        action='store_true', default=False,
+                        help='rebuild collections from librarian.')
+    parser.add_argument('--update-calibre',  dest='update_calibre',
+                        action='store_true', default=False,
+                        help='update collections from calibre kindle plugin.')
+    parser.add_argument('--rebuild-calibre', dest='rebuild_calibre',
+                        action='store_true', default=False,
+                        help='rebuild collections from calibre kindle plugin.')
 
     args = parser.parse_args()
 
@@ -230,20 +294,30 @@ if __name__ == "__main__":
         with sqlite3.connect(KINDLE_DB_PATH) as cc_db:
             c = cc_db.cursor()
             if args.rebuild:
-                log(LIBRARIAN_SYNC, "rebuild", "Rebuilding collections (librarian)...")
-                update_cc_db(c, complete_rebuild = True, source = "librarian")
+                log(LIBRARIAN_SYNC, "rebuild",
+                    "Rebuilding collections (librarian)...")
+                update_cc_db(c, complete_rebuild=True,
+                             source="librarian")
             elif args.update:
-                log(LIBRARIAN_SYNC, "update", "Updating collections (librarian)...")
-                update_cc_db(c, complete_rebuild = False, source = "librarian")
+                log(LIBRARIAN_SYNC, "update",
+                    "Updating collections (librarian)...")
+                update_cc_db(c, complete_rebuild=False,
+                             source="librarian")
             elif args.folders:
-                log(LIBRARIAN_SYNC, "rebuild_from_folders", "Rebuilding collections (folders)...")
-                update_cc_db(c, complete_rebuild = True, source = "folders")
+                log(LIBRARIAN_SYNC, "rebuild_from_folders",
+                    "Rebuilding collections (folders)...")
+                update_cc_db(c, complete_rebuild=True,
+                             source="folders")
             elif args.rebuild_calibre:
-                log(LIBRARIAN_SYNC, "rebuild_from_calibre_plugin_json", "Rebuilding collections (Calibre)...")
-                update_cc_db(c, complete_rebuild = True, source = "calibre_plugin")
+                log(LIBRARIAN_SYNC, "rebuild_from_calibre_plugin_json",
+                    "Rebuilding collections (Calibre)...")
+                update_cc_db(c, complete_rebuild=True,
+                             source="calibre_plugin")
             elif args.update_calibre:
-                log(LIBRARIAN_SYNC, "update_from_calibre_plugin_json", "Updating collections (Calibre)...")
-                update_cc_db(c, complete_rebuild = False, source = "calibre_plugin")
+                log(LIBRARIAN_SYNC, "update_from_calibre_plugin_json",
+                    "Updating collections (Calibre)...")
+                update_cc_db(c, complete_rebuild=False,
+                             source="calibre_plugin")
             elif args.export:
                 log(LIBRARIAN_SYNC, "export", "Exporting collections...")
                 export_existing_collections(c)
@@ -254,7 +328,7 @@ if __name__ == "__main__":
         log(LIBRARIAN_SYNC, "main", "Something went very wrong.", "E")
         traceback.print_exc()
     else:
-        log(LIBRARIAN_SYNC, "main", "Done in %.02fs."%(time.time()-start))
+        log(LIBRARIAN_SYNC, "main", "Done in %.02fs." % (time.time()-start))
         # Take care of buffered IO & KUAL's IO redirection...
         sys.stdout.flush()
         sys.stderr.flush()
