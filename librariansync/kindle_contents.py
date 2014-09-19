@@ -63,12 +63,12 @@ class Ebook(object):
             self.collections.append(collection)
 
     def to_librarian_json(self):
-        if self.collections == []:
+        if self.original_collections == []:
             return {}
         else:
             return {
                 get_relative_path(self.location):
-                    [coll.label for coll in self.collections]
+                    [coll.label for coll in self.original_collections]
                     }
 
 
@@ -94,7 +94,7 @@ class Collection(object):
     # couples of our book list
     def build_legacy_hashes_list(self):
         hashes_list = []
-        for e in self.ebooks:
+        for e in self.original_ebooks:
             if e.cdekey.startswith('*'):
                 # No ASIN set, we don't care about the cdeType, use it as-is
                 hashes_list.append(e.cdekey)
@@ -104,7 +104,7 @@ class Collection(object):
         return hashes_list
 
     def to_calibre_plugin_json(self):
-        if self.ebooks == []:
+        if self.original_ebooks == []:
             return {}
         else:
             return {
