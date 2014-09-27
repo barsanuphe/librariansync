@@ -386,9 +386,14 @@ changes made.
 Each ebook path (relative to the **documents** folder) is associated to a
 list of collection names.
 
+If the path begins with *re:*, then it is interpreted as a python regular
+expression.
+Any ebook matching it will be added to the collections in the associated list.
+
     {
         "library/Alexandre Dumas/Alexandre Dumas (2004) Les Trois Mousquetaires.mobi": ["gutenberg","french","already read"],
         "library/Alexandre Dumas/Alexandre Dumas (2004) Vingt Ans Après.mobi": ["gutenberg","french","not read yet"],
-        "library/Alexandre Dumas/Alexandre Dumas (2011) Le Comte De Monte-Cristo.mobi": ["gutenberg","french","already read"]
+        "library/Alexandre Dumas/Alexandre Dumas (2011) Le Comte De Monte-Cristo.mobi": ["gutenberg","french","already read"],
+        "re:Alexandre Dumas (Père|Fils)": ["dumas"]
     }
 
