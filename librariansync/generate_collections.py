@@ -51,16 +51,17 @@ def parse_entries(cursor, ignore_empty_collections=False):
     cursor.execute(SELECT_EXISTING_COLLECTIONS)
     for (collection_uuid, ebook_uuid) in cursor.fetchall():
         collection_idx = find_collection(db_collections, collection_uuid)
-        ebook_idx = find_ebook(db_ebooks, ebook_uuid)
-        if collection_idx != -1 and ebook_idx != -1:
-            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx],
-                                                     True)
-            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx],
-                                                True)
+        ebook_idx_list = find_ebook(db_ebooks, ebook_uuid)
+        if collection_idx != -1 and ebook_idx_list != []:
+            for ebook_idx in ebook_idx_list:
+                db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx],
+                                                        True)
+                db_ebooks[ebook_idx].add_collection(
+                    db_collections[collection_idx], True)
         else:
             log(LIBRARIAN_SYNC, "parse_entries",
-                "Skipping collection {} (collection_idx: {}, ebook_idx: {})"
-                .format(collection_uuid, collection_idx, ebook_idx),
+                "Skipping collection {} (collection_idx: {}, ebook_uuid: {})"
+                .format(collection_uuid, collection_idx, ebook_uuid),
                 "W", display=False)
 
     # remove empty collections:
@@ -95,9 +96,12 @@ def update_lists_from_librarian_json(db_ebooks, db_collections,
     for (ebook_location,
          ebook_collection_labels_list) in collection_contents.items():
         # find ebook by location
-        ebook_idx = find_ebook(db_ebooks, os.path.join(KINDLE_EBOOKS_ROOT,
-                                                       ebook_location))
-        if ebook_idx == -1:
+        if ebook_location.startswith("re:"):
+            ebook_idx_list = find_ebook(db_ebooks, ebook_location, regexp=True)
+        else:
+            ebook_idx_list = find_ebook(db_ebooks, os.path.join(
+                KINDLE_EBOOKS_ROOT, ebook_location))
+        if ebook_idx_list == []:
             log(LIBRARIAN_SYNC, "update librarian",
                 "Invalid location: %s" % ebook_location.encode("utf8"),
                 "W", display=False)
@@ -111,10 +115,12 @@ def update_lists_from_librarian_json(db_ebooks, db_collections,
                                                  collection_label,
                                                  is_new=True))
                 collection_idx = len(db_collections)-1
-            # udpate ebook
-            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
-            # update collection
-            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
+            for ebook_idx in ebook_idx_list:
+                # udpate ebook
+                db_ebooks[ebook_idx].add_collection(
+                    db_collections[collection_idx])
+                # update collection
+                db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
 
     # remove empty collections:
     db_collections = [c for c in db_collections if len(c.ebooks) != 0]
@@ -151,17 +157,19 @@ def update_lists_from_calibre_plugin_json(db_ebooks, db_collections,
             # unless we run into the extremely unlikely case of two items with
             # the same cdeKey, but different cdeTypes
             # find ebook by cdeKey
-            ebook_idx = find_ebook(db_ebooks, cdekey)
-            if ebook_idx == -1:
+            ebook_idx_list = find_ebook(db_ebooks, cdekey)
+            if ebook_idx_list == []:
                 log(LIBRARIAN_SYNC, "update calibre",
                     "Couldn't match a db uuid to cdeKey %s"
                     "(book not on device?)" % cdekey,
                     "W", display=False)
                 continue  # invalid
-            # update ebook
-            db_ebooks[ebook_idx].add_collection(db_collections[collection_idx])
-            # update collection
-            db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
+            for ebook_idx in ebook_idx_list:
+                # update ebook
+                db_ebooks[ebook_idx].add_collection(
+                    db_collections[collection_idx])
+                # update collection
+                db_collections[collection_idx].add_ebook(db_ebooks[ebook_idx])
 
     # remove empty collections:
     db_collections = [c for c in db_collections if len(c.ebooks) != 0]

@@ -1,4 +1,5 @@
 import os
+import re
 import locale
 import time
 
@@ -128,10 +129,18 @@ def find_collection(collections, collection_uuid_or_label):
 
 # same for uuid & location. Note that we add matching an uuid to a cdeKey in
 # order to handle the legacy json db schema.
-def find_ebook(ebooks, ebook_uuid_or_location_or_cdekey):
+def find_ebook(ebooks, ebook_identifier, regexp=False):
+    if regexp:
+        pattern = re.compile(ebook_identifier.split("re:")[1], re.UNICODE)
+    hits = []
     for (i, ebook) in enumerate(ebooks):
-        if ebook.uuid == ebook_uuid_or_location_or_cdekey or\
-           ebook.location == ebook_uuid_or_location_or_cdekey or\
-           ebook.cdekey == ebook_uuid_or_location_or_cdekey:
-            return i
-    return -1
+        if not regexp and (ebook.uuid == ebook_identifier or
+                           ebook.location == ebook_identifier or
+                           ebook.cdekey == ebook_identifier):
+            hits.append(i)
+
+        if regexp and (pattern.search(ebook.uuid) or
+                       pattern.search(ebook.location) or
+                       pattern.search(str(ebook.cdekey))):
+            hits.append(i)
+    return hits
