@@ -55,7 +55,7 @@ class CCUpdate(object):
                         }
                     ],
                 "isVisibleInHome": 1,
-                "isArchived": 1,
+                "isArchived": 0,
                 "mimeType": "application/x-kindle-collection",
                 "collections": None
             }
@@ -65,7 +65,8 @@ class CCUpdate(object):
             json_dict["insert"].update(
                 {
                     "collectionCount": None,
-                    "collectionDataSetName": str(coll_uuid)
+                    "collectionDataSetName": str(coll_uuid),
+                    "isArchived": 1
                 })
         self.commands.append(json_dict)
 
