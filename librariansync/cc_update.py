@@ -55,7 +55,8 @@ class CCUpdate(object):
                         }
                     ],
                 "isVisibleInHome": 1,
-                "isArchived": 0,
+                "isArchived": 1,
+                "mimeType": "application/x-kindle-collection",
                 "collections": None
             }
         }
