@@ -5,7 +5,7 @@
 
 A KUAL script that can automatically build the collections based on the tags added
 with librarian, according to the folder structure, or based on collections
-created with the Calibre Kindle Collections plugin.
+created with the [Calibre Kindle Collections plugin](http://www.mobileread.com/forums/showthread.php?t=244202).
 It and should work on all Kindle 5 models (Touch, Paperwhite 1 & 2) with
 reasonnably recent firmware.
 
@@ -30,7 +30,7 @@ For instructions on how to do that, try the
 [mobileread forum](http://www.mobileread.com/forums/forumdisplay.php?f=150) in
 general.
 
-LibrarianSync additional information can be found in [its mobileread thread](http://www.mobileread.com/forums/showthread.php?p=2903535)
+LibrarianSync additional information can be found in [its very own mobileread thread](http://www.mobileread.com/forums/showthread.php?p=2903535).
 
 
 This script is inspired by
@@ -45,6 +45,7 @@ Alternatively, it is possible to build a kindle update package using
 [KindleTool](https://github.com/NiLuJe/KindleTool) by running
 *tools/build-librariansync-bin.sh*.
 This .bin package is then installable with the [MobileRead Package Installer](http://www.mobileread.com/forums/showthread.php?t=251143).
+
 The [LS MobileRead thread](http://www.mobileread.com/forums/showthread.php?p=2903535) contains packages ready to install.
 
 ### Usage
@@ -61,10 +62,10 @@ which contains two entries:
     inside the **documents** folder.
 - *Rebuild collections (from calibre plugin json)* :
     to clear all existing collections and rebuild them using a json file generated
-    by the Calibre Kindle collections plugin
+    by the [Calibre Kindle Collections plugin](http://www.mobileread.com/forums/showthread.php?t=244202)
 - *Update collections (from calibre plugin json)* :
     to only add ebooks to existing or new collections, using a json file generated
-    by the Calibre Kindle collections plugin
+    by the [Calibre Kindle Collections plugin](http://www.mobileread.com/forums/showthread.php?t=244202)
 - *Export current collections* :
     generates exported_collections.json in the **extensions** folder from current
     collections.
@@ -97,9 +98,9 @@ addresses can define serveral interfaces of the same server, or different server
 
 ### What it does
 
-After syncing with the main script librarian, and if tags are defined in
-library.yaml for entries, the **extensions** folder on the Kindle should contain
-a file, collections.json.
+The native format for collections, described [here](#collectionsjson-example),
+is expected to be a file named **extensions/collections.json** on a Kindle.
+
 
 When *rebuilding collections*, LibrarianSync removes all collections, then adds
 the collections as defined in collections.json.
