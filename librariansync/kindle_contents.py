@@ -3,6 +3,8 @@ import re
 import locale
 import time
 
+from kindle_logging import log, LIBRARIAN_SYNC
+
 KINDLE_EBOOKS_ROOT = "/mnt/us/documents/"
 
 SUPPORTED_EXTENSIONS = [".azw",
@@ -96,12 +98,19 @@ class Collection(object):
     def build_legacy_hashes_list(self):
         hashes_list = []
         for e in self.original_ebooks:
-            if e.cdekey.startswith('*'):
-                # No ASIN set, we don't care about the cdeType, use it as-is
-                hashes_list.append(e.cdekey)
+            # Guard against NULL cdeKeys, which should never happen for books, but have been seen in the wild w/ manually sideloaded stuff...
+            if e.cdekey:
+                if e.cdekey.startswith('*'):
+                    # No ASIN set, we don't care about the cdeType, use it as-is
+                    hashes_list.append(e.cdekey)
+                else:
+                    # Proper or fake ASIN set, build the hash
+                    hashes_list.append('#{}^{}'.format(e.cdekey, e.cdetype))
             else:
-                # Proper or fake ASIN set, build the hash
-                hashes_list.append('#{}^{}'.format(e.cdekey, e.cdetype))
+                log(LIBRARIAN_SYNC, "legacy hash building",
+                    "Book %s has no cdeKey?! Skipping it."
+                    "(sideloaded book?)" % e.location,
+                    "W", display=False)
         return hashes_list
 
     def to_calibre_plugin_json(self):
