@@ -3,10 +3,10 @@
 
 ## What it is
 
-A KUAL script that can automatically build the collections based on the tags added
+A KUAL script that can automatically build collections based on the tags added
 with librarian, according to the folder structure, or based on collections
 created with the [Calibre Kindle Collections plugin](http://www.mobileread.com/forums/showthread.php?t=244202).
-It and should work on all Kindle 5 models (Touch, Paperwhite 1 & 2) with
+It should work on all Kindle 5 models (Touch, PaperWhite 1, PaperWhite 2, Basic, Voyage, PaperWhite 3) with
 reasonnably recent firmware.
 
 ## Table of Contents
@@ -21,16 +21,16 @@ reasonnably recent firmware.
 ### Requirements
 
 
-- [A jailbroken Kindle Paperwhite2](http://www.mobileread.com/forums/showthread.php?t=186645)
-- [Mobiread Kindlet Kit installed](http://www.mobileread.com/forums/showthread.php?t=233932)
+- [A JailBroken Device](http://www.mobileread.com/forums/showthread.php?t=186645)
+- [Mobiread Kindlet Kit installed](http://www.mobileread.com/forums/showthread.php?t=233932) (should be bundled with most recent JBs)
 - [KUAL installed](http://www.mobileread.com/forums/showthread.php?t=203326)
-- [Python installed](http://www.mobileread.com/forums/showthread.php?t=225030) (snapshot > 0.10N-r10867)
+- [Python installed](http://www.mobileread.com/forums/showthread.php?t=195474) (a decently recent enough version, >= 0.11.N)
 
-For instructions on how to do that, try the
-[mobileread forum](http://www.mobileread.com/forums/forumdisplay.php?f=150) in
+For instructions on how to do that, try the dedicated
+[MobileRead forum](http://www.mobileread.com/forums/forumdisplay.php?f=150) in
 general.
 
-LibrarianSync additional information can be found in [its very own mobileread thread](http://www.mobileread.com/forums/showthread.php?p=2903535).
+Additional information on LibrarianSync can be found in [its very own MobileRead thread](http://www.mobileread.com/forums/showthread.php?p=2903535).
 
 
 This script is inspired by
@@ -89,7 +89,7 @@ file such as:
     port = 13698
 
 
-*IP* is a |-separated list of IP addresses.
+*IP* is a pipe-separated (|) list of IP addresses.
 The IP address should be the same as the one given in the *librarian* configuration.
 
 When more than one address is given, *LibrarianSync* tries to connect to each one.
@@ -122,7 +122,7 @@ from the current collections in the **extensions** folder. This file can be
 backed up, modified, and used to *rebuild collections* (if renamed
 *collections.json*).
 At the same time, another json file is written, to be used with the Calibre
-Kindle plugin.
+Kindle Collections plugin.
 
 When *downloading from librarian*, it connects (using Wi-Fi or USBNetwork, depending
 on your configuration) to the http server temporarily created by *librarian*,
