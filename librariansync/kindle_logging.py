@@ -16,18 +16,46 @@ with open('/proc/usid', 'r') as f:
     kusid = f.read()
 
 kmodel = kusid[2:4]
+kmodel_v2 = kusid[3:6]
+touch_devcodes = ['0F', '11', '10', '12']
 pw_devcodes = ['24', '1B', '1D', '1F', '1C', '20']
 pw2_devcodes = ['D4', '5A', 'D5', 'D6', 'D7', 'D8', 'F2', '17', '60', 'F4',
                 'F9', '62', '61', '5F']
+kv_devcodes = ['13', '54', '2A', '4F', '52', '53']
+kt2_devcodes = ['C6', 'DD']
+pw3_devcodes = ['0G1', '0G2', '0G4', '0G5', '0G6', '0G7']
 
-if kmodel in pw_devcodes or kmodel in pw2_devcodes:
+if kmodel in kv_devcodes:
+    SCREEN_X_RES = 1088
+    SCREEN_Y_RES = 1448
+    EIPS_X_RES = 16
+    EIPS_Y_RES = 24
+elif kmodel in pw_devcodes or kmodel in pw2_devcodes:
     # PaperWhite 1/2
     SCREEN_X_RES = 768
     SCREEN_Y_RES = 1024
     EIPS_X_RES = 16
     EIPS_Y_RES = 24
-else:
+elif kmodel in kt2_devcodes:
+    # KT2
+    SCREEN_X_RES = 608
+    SCREEN_Y_RES = 800
+    EIPS_X_RES = 16
+    EIPS_Y_RES = 24
+elif kmodel in touch_devcodes:
     # Touch
+    SCREEN_X_RES = 600
+    SCREEN_Y_RES = 800
+    EIPS_X_RES = 12
+    EIPS_Y_RES = 20
+elif kmodel_v2 in pw3_devcodes:
+    # PW3 (NOTE: Hopefully matches the KV...)
+    SCREEN_X_RES = 1088
+    SCREEN_Y_RES = 1448
+    EIPS_X_RES = 16
+    EIPS_Y_RES = 24
+else:
+    # Fallback.
     SCREEN_X_RES = 600
     SCREEN_Y_RES = 800
     EIPS_X_RES = 12
