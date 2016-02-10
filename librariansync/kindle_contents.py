@@ -22,7 +22,8 @@ SUPPORTED_EXTENSIONS = [".azw",
                         ".htm",
                         ".jpg",
                         ".jpeg",
-                        ".azw2"]
+                        ".azw2",
+                        ".kfx"]
 
 
 # -------- Folders
