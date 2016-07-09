@@ -9,7 +9,7 @@ LIBRARIAN_SYNC = "LibrarianSync"
 
 # We'll need this to kill stderr
 DEVNULL = open(os.devnull, 'wb')
-# NOTE: Use subprocess.DEVNULL w/ Python 3.3
+# NOTE: Use subprocess.DEVNULL w/ Python >= 3.3
 
 # Do the device check dance...
 with open('/proc/usid', 'r') as f:
@@ -23,7 +23,10 @@ pw2_devcodes = ['D4', '5A', 'D5', 'D6', 'D7', 'D8', 'F2', '17', '60', 'F4',
                 'F9', '62', '61', '5F']
 kv_devcodes = ['13', '54', '2A', '4F', '52', '53']
 kt2_devcodes = ['C6', 'DD']
-pw3_devcodes = ['0G1', '0G2', '0G4', '0G5', '0G6', '0G7']
+pw3_devcodes = ['0G1', '0G2', '0G4', '0G5', '0G6', '0G7',
+                '0KB', '0KC', '0KD', '0KE', '0KF', '0KG']
+koa_devcodes = ['0GC', '0GD', '0GP', '0GQ', '0GR', '0GS']
+kt3_devcodes = ['0DT', '0K9', '0KA']
 
 if kmodel in kv_devcodes:
     SCREEN_X_RES = 1088
@@ -48,10 +51,16 @@ elif kmodel in touch_devcodes:
     SCREEN_Y_RES = 800
     EIPS_X_RES = 12
     EIPS_Y_RES = 20
-elif kmodel_v2 in pw3_devcodes:
-    # PW3 (NOTE: Hopefully matches the KV...)
+elif kmodel_v2 in pw3_devcodes or kmodel_v2 in koa_devcodes:
+    # PW3 & Oasis (NOTE: Hopefully matches the KV...)
     SCREEN_X_RES = 1088
     SCREEN_Y_RES = 1448
+    EIPS_X_RES = 16
+    EIPS_Y_RES = 24
+elif kmodel_v2 in kt3_devcodes:
+    # KT3 (NOTE: Hopefully matches the KT2...)
+    SCREEN_X_RES = 608
+    SCREEN_Y_RES = 800
     EIPS_X_RES = 16
     EIPS_Y_RES = 24
 else:
