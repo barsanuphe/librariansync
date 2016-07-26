@@ -23,7 +23,8 @@ SUPPORTED_EXTENSIONS = [".azw",
                         ".jpg",
                         ".jpeg",
                         ".azw2",
-                        ".kfx"]
+                        ".kfx",
+                        ".epub"]
 
 
 # -------- Folders

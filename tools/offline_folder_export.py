@@ -29,7 +29,8 @@ SUPPORTED_EXTENSIONS = [".azw",
                         ".jpg",
                         ".jpeg",
                         ".azw2",
-                        ".kfx"]
+                        ".kfx",
+                        ".epub"]
 
 
 def list_folder_contents():
