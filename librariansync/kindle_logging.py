@@ -25,8 +25,8 @@ kv_devcodes = ['13', '54', '2A', '4F', '52', '53']
 kt2_devcodes = ['C6', 'DD']
 pw3_devcodes = ['0G1', '0G2', '0G4', '0G5', '0G6', '0G7',
                 '0KB', '0KC', '0KD', '0KE', '0KF', '0KG']
-koa_devcodes = ['0GC', '0GD', '0GP', '0GQ', '0GR', '0GS']
-kt3_devcodes = ['0DT', '0K9', '0KA']
+koa_devcodes = ['0GC', '0GD', '0GR', '0GS', '0GT', '0GU']
+kt3_devcodes = ['0DU', '0K9', '0KA']
 
 if kmodel in kv_devcodes:
     SCREEN_X_RES = 1088
