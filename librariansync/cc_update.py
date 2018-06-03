@@ -101,15 +101,13 @@ class CCUpdate(object):
             full_command = {"commands": self.commands,
                             "type": "ChangeRequest", "id": 1}
             # When WiFi's enabled, we inherit the WhisperSync proxy, which we *cannot* go through,
-            # since we're talking to a local service.
+            # since we're talking to a local service. So make sure we do *NOT* use any proxies.
+            # Turns out that this is *slightly* tricky to achieve with requests,
             # c.f., https://github.com/requests/requests/issues/879#issuecomment-10001977
-            NO_PROXY = {
-                'no': 'pass',
-            }
             r = requests.post("http://127.0.0.1:9101/change",
                               data=json.dumps(full_command),
                               headers={'content-type': 'application/json'},
-                              proxies=NO_PROXY)
+                              proxies={'no': 'pass'})
             if r.json()[u"ok"]:
                 log(LIBRARIAN_SYNC, "cc_update", "Success.")
             else:
