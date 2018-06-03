@@ -22,8 +22,9 @@ if (( $(/usr/bin/kindletool version | wc -l) != 1 )) ; then
 fi
 
 # create tar.gz
-cp -R ../librariansync .
-cp ../README.md .
+mkdir -p ./librariansync
+cp -avR ../librariansync/* ./librariansync
+cp -av ../README.md .
 tar -zcvf librariansync.tar.gz \
     librariansync/generate_collections.py \
     librariansync/menu.json \
