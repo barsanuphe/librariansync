@@ -110,7 +110,7 @@ class CCUpdate(object):
                               data=json.dumps(full_command),
                               headers={'content-type': 'application/json'},
                               proxies={'no': 'pass'})
-            if r.json()[u"ok"]:
+            if r.status_code == requests.codes.ok and r.json()[u"ok"]:
                 log(LIBRARIAN_SYNC, "cc_update", "Success.")
             else:
                 log(LIBRARIAN_SYNC, "cc_update", "Oh, no. It failed.", "E")
