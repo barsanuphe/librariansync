@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 import json
@@ -104,6 +105,7 @@ class CCUpdate(object):
             # since we're talking to a local service. So make sure we do *NOT* use any proxies.
             # Turns out that this is *slightly* tricky to achieve with requests,
             # c.f., https://github.com/requests/requests/issues/879#issuecomment-10001977
+            os.environ['no_proxy'] = '127.0.0.1,localhost'
             r = requests.post("http://127.0.0.1:9101/change",
                               data=json.dumps(full_command),
                               headers={'content-type': 'application/json'},
