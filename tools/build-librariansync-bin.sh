@@ -13,7 +13,7 @@ DEVICE="kindle5"
 
 # Setup KindleTool packaging metadata flags to avoid cluttering the invocations
 PKGREV="$(git describe --tags --always HEAD)"
-KT_PM_FLAGS=( "-xPackageName=${PKGNAME}" "-xPackageVersion=${PKGVER}-r${PKGREV}" "-xPackageAuthor=barsanuphe" "-xPackageMaintainer=barsanuphe" "-X" )
+KT_PM_FLAGS=( "-xPackageName=${PKGNAME}" "-xPackageVersion=${PKGVER}-g${PKGREV}" "-xPackageAuthor=barsanuphe" "-xPackageMaintainer=barsanuphe" "-X" )
 
 # check for kindletool
 if (( $(/usr/bin/kindletool version | wc -l) != 1 )) ; then
