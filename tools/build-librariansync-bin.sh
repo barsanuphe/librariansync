@@ -1,4 +1,4 @@
-#! /bin/sh -e
+#! /bin/bash -e
 
 # checking argument
 if [ $# -eq 0 ]; then
@@ -10,6 +10,10 @@ HACKNAME="librariansync"
 PKGNAME="${HACKNAME}"
 PKGVER=$1
 DEVICE="kindle5"
+
+# Setup KindleTool packaging metadata flags to avoid cluttering the invocations
+PKGREV="$(git describe --tags --always HEAD)"
+KT_PM_FLAGS=( "-xPackageName=${PKGNAME}" "-xPackageVersion=${PKGVER}-r${PKGREV}" "-xPackageAuthor=barsanuphe" "-xPackageMaintainer=barsanuphe" "-X" )
 
 # check for kindletool
 if (( $(/usr/bin/kindletool version | wc -l) != 1 )) ; then
@@ -34,7 +38,7 @@ tar -zcvf librariansync.tar.gz \
 sed -i "s/<version>1.0<\/version>/<version>${PKGVER}<\/version>/g" librariansync/config.xml
 
 # build the update
-/usr/bin/kindletool create ota2 -d ${DEVICE} librariansync.tar.gz install.sh Update_${PKGNAME}_${PKGVER}_${DEVICE}.bin
+/usr/bin/kindletool create ota2 "${KT_PM_FLAGS[@]}" -d ${DEVICE} librariansync.tar.gz install.sh Update_${PKGNAME}_${PKGVER}_${DEVICE}.bin
 
 # create release archive
 tar -zcvf librariansync-${PKGVER}.tar.gz Update_${PKGNAME}_${PKGVER}_${DEVICE}.bin README.md
