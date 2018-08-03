@@ -1,6 +1,5 @@
 *.pyc
 *.yaml
-*.json
 *.tar.gz
 *.db
 *.dump
