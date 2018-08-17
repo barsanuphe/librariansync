@@ -23,10 +23,13 @@ pw2_devcodes = ['D4', '5A', 'D5', 'D6', 'D7', 'D8', 'F2', '17', '60', 'F4',
                 'F9', '62', '61', '5F']
 kv_devcodes = ['13', '54', '2A', '4F', '52', '53']
 kt2_devcodes = ['C6', 'DD']
-pw3_devcodes = ['0G1', '0G2', '0G4', '0G5', '0G6', '0G7',
-                '0KB', '0KC', '0KD', '0KE', '0KF', '0KG']
+pw3_devcodes = ['0G1', '0G2', '0G4', '0G5', '0G6', '0G7', '0KB',
+                '0KC', '0KD', '0KE', '0KF', '0KG', '0LK', '0LL']
 koa_devcodes = ['0GC', '0GD', '0GR', '0GS', '0GT', '0GU']
 kt3_devcodes = ['0DU', '0K9', '0KA']
+koa2_devcodes = ['0LM', '0LN', '0LP', '0LQ', '0P1', '0P2',
+                 '0P6', '0P7', '0P8', '0S1', '0S2', '0S3',
+                 '0S4', '0S7', '0SA']
 
 if kmodel in kv_devcodes:
     SCREEN_X_RES = 1088
@@ -52,17 +55,23 @@ elif kmodel in touch_devcodes:
     EIPS_X_RES = 12
     EIPS_Y_RES = 20
 elif kmodel_v2 in pw3_devcodes or kmodel_v2 in koa_devcodes:
-    # PW3 & Oasis (NOTE: Hopefully matches the KV...)
+    # PW3 & Oasis
     SCREEN_X_RES = 1088
     SCREEN_Y_RES = 1448
     EIPS_X_RES = 16
     EIPS_Y_RES = 24
 elif kmodel_v2 in kt3_devcodes:
-    # KT3 (NOTE: Hopefully matches the KT2...)
+    # KT3
     SCREEN_X_RES = 608
     SCREEN_Y_RES = 800
     EIPS_X_RES = 16
     EIPS_Y_RES = 24
+elif kmodel_v2 in koa2_devcodes:
+    # Oasis 2
+    SCREEN_X_RES=1280
+    SCREEN_Y_RES=1680
+    EIPS_X_RES=16
+    EIPS_Y_RES=24
 else:
     # Fallback.
     SCREEN_X_RES = 600

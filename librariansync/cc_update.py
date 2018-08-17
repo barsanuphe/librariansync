@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 import json
@@ -100,10 +101,16 @@ class CCUpdate(object):
             log(LIBRARIAN_SYNC, "cc_update", "Sending commands...")
             full_command = {"commands": self.commands,
                             "type": "ChangeRequest", "id": 1}
-            r = requests.post("http://localhost:9101/change",
+            # When WiFi's enabled, we inherit the WhisperSync proxy, which we *cannot* go through,
+            # since we're talking to a local service. So make sure we do *NOT* use any proxies.
+            # Turns out that this is *slightly* tricky to achieve with requests,
+            # c.f., https://github.com/requests/requests/issues/879#issuecomment-10001977
+            os.environ['no_proxy'] = '127.0.0.1,localhost'
+            r = requests.post("http://127.0.0.1:9101/change",
                               data=json.dumps(full_command),
-                              headers={'content-type': 'application/json'})
-            if r.json()[u"ok"]:
+                              headers={'content-type': 'application/json'},
+                              proxies={'no': 'pass'})
+            if r.status_code == requests.codes.ok:
                 log(LIBRARIAN_SYNC, "cc_update", "Success.")
             else:
                 log(LIBRARIAN_SYNC, "cc_update", "Oh, no. It failed.", "E")
