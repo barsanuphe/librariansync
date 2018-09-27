@@ -32,19 +32,19 @@ koa2_devcodes = ['0LM', '0LN', '0LP', '0LQ', '0P1', '0P2',
                  '0S4', '0S7', '0SA']
 
 if kmodel in kv_devcodes:
-    SCREEN_X_RES = 1072
+    SCREEN_X_RES = 1088
     SCREEN_Y_RES = 1448
     EIPS_X_RES = 16
     EIPS_Y_RES = 24
 elif kmodel in pw_devcodes or kmodel in pw2_devcodes:
     # PaperWhite 1/2
-    SCREEN_X_RES = 758
+    SCREEN_X_RES = 768
     SCREEN_Y_RES = 1024
     EIPS_X_RES = 16
     EIPS_Y_RES = 24
 elif kmodel in kt2_devcodes:
     # KT2
-    SCREEN_X_RES = 600
+    SCREEN_X_RES = 608
     SCREEN_Y_RES = 800
     EIPS_X_RES = 16
     EIPS_Y_RES = 24
@@ -56,19 +56,19 @@ elif kmodel in touch_devcodes:
     EIPS_Y_RES = 20
 elif kmodel_v2 in pw3_devcodes or kmodel_v2 in koa_devcodes:
     # PW3 & Oasis
-    SCREEN_X_RES = 1072
+    SCREEN_X_RES = 1088
     SCREEN_Y_RES = 1448
     EIPS_X_RES = 16
     EIPS_Y_RES = 24
 elif kmodel_v2 in kt3_devcodes:
     # KT3
-    SCREEN_X_RES = 600
+    SCREEN_X_RES = 608
     SCREEN_Y_RES = 800
     EIPS_X_RES = 16
     EIPS_Y_RES = 24
 elif kmodel_v2 in koa2_devcodes:
     # Oasis 2
-    SCREEN_X_RES=1264
+    SCREEN_X_RES=1280
     SCREEN_Y_RES=1680
     EIPS_X_RES=16
     EIPS_Y_RES=24
