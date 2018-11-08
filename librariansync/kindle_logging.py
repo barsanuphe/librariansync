@@ -30,6 +30,8 @@ kt3_devcodes = ['0DU', '0K9', '0KA']
 koa2_devcodes = ['0LM', '0LN', '0LP', '0LQ', '0P1', '0P2',
                  '0P6', '0P7', '0P8', '0S1', '0S2', '0S3',
                  '0S4', '0S7', '0SA']
+pw4_devcode = ['0PP', '0T1', '0T2', '0T3', '0T4', '0T5',
+               '0T6', '0T7', '0TJ', '0TK', '0TL', '0TM', '0TN']
 
 if kmodel in kv_devcodes:
     SCREEN_X_RES = 1088
@@ -54,8 +56,8 @@ elif kmodel in touch_devcodes:
     SCREEN_Y_RES = 800
     EIPS_X_RES = 12
     EIPS_Y_RES = 20
-elif kmodel_v2 in pw3_devcodes or kmodel_v2 in koa_devcodes:
-    # PW3 & Oasis
+elif kmodel_v2 in pw3_devcodes or kmodel_v2 in koa_devcodes or kmodel_v2 in pw4_devcodes:
+    # PW3/PW4 & Oasis
     SCREEN_X_RES = 1088
     SCREEN_Y_RES = 1448
     EIPS_X_RES = 16
