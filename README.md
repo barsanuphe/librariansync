@@ -6,7 +6,7 @@
 A KUAL script that can automatically build collections based on the tags added
 with librarian, according to the folder structure, or based on collections
 created with the [Calibre Kindle Collections plugin](http://www.mobileread.com/forums/showthread.php?t=244202).
-It should work on all Kindle 5 models (Touch, PaperWhite 1, PaperWhite 2, Basic, Voyage, PaperWhite 3) with
+It should work on all Kindle 5 models (Touch, PaperWhite 1, PaperWhite 2, Voyage, Basic, PaperWhite 3, Oasis, Basic 2, Oasis 2, PaperWhite 4) with
 reasonnably recent firmware.
 
 ## Table of Contents
