@@ -44,4 +44,3 @@ def log(program, function, msg, level="I", display=True):
         displayed += msg.encode('utf-8', 'replace')
         # print using fbink
         fbink.fbink_print(fbink.FBFD_AUTO, "%s\n%s" % (program_display, displayed), FBINK_CFG)
-        LAST_SHOWN = time.time()
