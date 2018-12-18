@@ -1,3 +1,4 @@
+import sys
 import syslog
 from _fbink import ffi, lib as fbink
 
@@ -16,6 +17,16 @@ FBINK_CFG.row = -6
 
 # And initialize it
 fbink.fbink_init(fbink.FBFD_AUTO, FBINK_CFG)
+
+
+# Pilfered from KindleUnpack, with minor tweaks ;).
+# force string to be utf-8 encoded whether unicode or bytestring
+def utf8_str(p, enc=sys.getfilesystemencoding()):
+    if isinstance(p, unicode):
+        return p.encode('utf-8')
+    if enc != 'utf-8':
+        return p.decode(enc).encode('utf-8', 'replace')
+    return p
 
 
 def log(program, function, msg, level="I", display=True):
@@ -41,6 +52,6 @@ def log(program, function, msg, level="I", display=True):
         # If loglevel is anything else than I, add it to our tag
         if level != "I":
             displayed += "[%s] " % level
-        displayed += msg.encode('utf-8', 'replace')
+        displayed += utf8_str(msg)
         # print using fbink
         fbink.fbink_print(fbink.FBFD_AUTO, "%s\n%s" % (program_display, displayed), FBINK_CFG)
