@@ -1,13 +1,9 @@
 import syslog
-import time
 from _fbink import ffi, lib as fbink
 
 # ------- Logging & user feedback (from the K5 Fonts Hack)
 
 LIBRARIAN_SYNC = "LibrarianSync"
-
-LAST_SHOWN = 0
-MINIMAL_DELAY = 0.15
 
 # Setup FBInk to our liking...
 FBINK_CFG = ffi.new("FBInkConfig *")
@@ -46,11 +42,6 @@ def log(program, function, msg, level="I", display=True):
         if level != "I":
             displayed += "[%s] " % level
         displayed += msg.encode('utf-8', 'replace')
-        # to prevent unsightly screen flickering if ever two logs
-        # are to be displayed in close temporal proximity
-        delta = time.time() - LAST_SHOWN
-        if delta < MINIMAL_DELAY:
-            time.sleep(MINIMAL_DELAY - delta)
         # print using fbink
         fbink.fbink_print(fbink.FBFD_AUTO, "%s\n%s" % (program_display, displayed), FBINK_CFG)
         LAST_SHOWN = time.time()
