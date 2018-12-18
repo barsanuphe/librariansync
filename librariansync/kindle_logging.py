@@ -1,5 +1,6 @@
 import sys
 import syslog
+# Requires a Python snapshot circa 0.15.N-r15585
 from _fbink import ffi, lib as fbink
 
 # ------- Logging & user feedback (from the K5 Fonts Hack)
@@ -53,5 +54,5 @@ def log(program, function, msg, level="I", display=True):
         if level != "I":
             displayed += "[%s] " % level
         displayed += utf8_str(msg)
-        # print using fbink
+        # print using FBInk (via cFFI)
         fbink.fbink_print(fbink.FBFD_AUTO, "%s\n%s" % (program_display, displayed), FBINK_CFG)
