@@ -1,94 +1,39 @@
-import os
+import sys
 import syslog
-import subprocess
-import time
+# Requires a Python snapshot circa 0.15.N-r15585
+from _fbink import ffi, lib as fbink
 
 # ------- Logging & user feedback (from the K5 Fonts Hack)
 
 LIBRARIAN_SYNC = "LibrarianSync"
 
-# We'll need this to kill stderr
-DEVNULL = open(os.devnull, 'wb')
-# NOTE: Use subprocess.DEVNULL w/ Python >= 3.3
+# Setup FBInk to our liking...
+FBINK_CFG = ffi.new("FBInkConfig *")
+FBINK_CFG.is_quiet = True
+FBINK_CFG.is_padded = True
+FBINK_CFG.is_centered = True
+# FIXME: Switch from padded + centered to rpadded when that hits a snapshot...
+#FBINK_CFG.is_rpadded = True
+FBINK_CFG.row = -6
 
-# Do the device check dance...
-with open('/proc/usid', 'r') as f:
-    kusid = f.read()
+# And initialize it
+fbink.fbink_init(fbink.FBFD_AUTO, FBINK_CFG)
 
-kmodel = kusid[2:4]
-kmodel_v2 = kusid[3:6]
-touch_devcodes = ['0F', '11', '10', '12']
-pw_devcodes = ['24', '1B', '1D', '1F', '1C', '20']
-pw2_devcodes = ['D4', '5A', 'D5', 'D6', 'D7', 'D8', 'F2', '17', '60', 'F4',
-                'F9', '62', '61', '5F']
-kv_devcodes = ['13', '54', '2A', '4F', '52', '53']
-kt2_devcodes = ['C6', 'DD']
-pw3_devcodes = ['0G1', '0G2', '0G4', '0G5', '0G6', '0G7', '0KB',
-                '0KC', '0KD', '0KE', '0KF', '0KG', '0LK', '0LL']
-koa_devcodes = ['0GC', '0GD', '0GR', '0GS', '0GT', '0GU']
-kt3_devcodes = ['0DU', '0K9', '0KA']
-koa2_devcodes = ['0LM', '0LN', '0LP', '0LQ', '0P1', '0P2',
-                 '0P6', '0P7', '0P8', '0S1', '0S2', '0S3',
-                 '0S4', '0S7', '0SA']
 
-if kmodel in kv_devcodes:
-    SCREEN_X_RES = 1088
-    SCREEN_Y_RES = 1448
-    EIPS_X_RES = 16
-    EIPS_Y_RES = 24
-elif kmodel in pw_devcodes or kmodel in pw2_devcodes:
-    # PaperWhite 1/2
-    SCREEN_X_RES = 768
-    SCREEN_Y_RES = 1024
-    EIPS_X_RES = 16
-    EIPS_Y_RES = 24
-elif kmodel in kt2_devcodes:
-    # KT2
-    SCREEN_X_RES = 608
-    SCREEN_Y_RES = 800
-    EIPS_X_RES = 16
-    EIPS_Y_RES = 24
-elif kmodel in touch_devcodes:
-    # Touch
-    SCREEN_X_RES = 600
-    SCREEN_Y_RES = 800
-    EIPS_X_RES = 12
-    EIPS_Y_RES = 20
-elif kmodel_v2 in pw3_devcodes or kmodel_v2 in koa_devcodes:
-    # PW3 & Oasis
-    SCREEN_X_RES = 1088
-    SCREEN_Y_RES = 1448
-    EIPS_X_RES = 16
-    EIPS_Y_RES = 24
-elif kmodel_v2 in kt3_devcodes:
-    # KT3
-    SCREEN_X_RES = 608
-    SCREEN_Y_RES = 800
-    EIPS_X_RES = 16
-    EIPS_Y_RES = 24
-elif kmodel_v2 in koa2_devcodes:
-    # Oasis 2
-    SCREEN_X_RES=1280
-    SCREEN_Y_RES=1680
-    EIPS_X_RES=16
-    EIPS_Y_RES=24
-else:
-    # Fallback.
-    SCREEN_X_RES = 600
-    SCREEN_Y_RES = 800
-    EIPS_X_RES = 12
-    EIPS_Y_RES = 20
-EIPS_MAXCHARS = SCREEN_X_RES / EIPS_X_RES
-EIPS_MAXLINES = SCREEN_Y_RES / EIPS_Y_RES
-
-LAST_SHOWN = 0
-MINIMAL_DELAY = 0.15
+# Pilfered from KindleUnpack, with minor tweaks ;).
+# force string to be utf-8 encoded whether unicode or bytestring
+def utf8_str(p, enc=sys.getfilesystemencoding()):
+    if isinstance(p, unicode):
+        return p.encode('utf-8')
+    if enc != 'utf-8':
+        return p.decode(enc).encode('utf-8', 'replace')
+    return p
 
 
 def log(program, function, msg, level="I", display=True):
     global LAST_SHOWN
     # open syslog
-    syslog.openlog('system: %s %s:%s:' % (level, program, function))
+    syslog.openlog("system: %s %s:%s:" % (level, program, function))
     # set priority
     priority = syslog.LOG_INFO
     if level == "E":
@@ -108,17 +53,6 @@ def log(program, function, msg, level="I", display=True):
         # If loglevel is anything else than I, add it to our tag
         if level != "I":
             displayed += "[%s] " % level
-        displayed += msg.encode('ascii', 'replace')
-        # pad with blanks
-        displayed += (EIPS_MAXCHARS - len(displayed))*' '
-        # to prevent unsightly screen flickering if ever two logs
-        # are to be displayed in close temporal proximity
-        delta = time.time() - LAST_SHOWN
-        if delta < MINIMAL_DELAY:
-            time.sleep(MINIMAL_DELAY-delta)
-        # print using eips
-        subprocess.call(['eips', '0', str(EIPS_MAXLINES - 3), program_display],
-                        stderr=DEVNULL)
-        subprocess.call(['eips', '0', str(EIPS_MAXLINES - 2), displayed],
-                        stderr=DEVNULL)
-        LAST_SHOWN = time.time()
+        displayed += utf8_str(msg)
+        # print using FBInk (via cFFI)
+        fbink.fbink_print(fbink.FBFD_AUTO, "%s\n%s" % (program_display, displayed), FBINK_CFG)
